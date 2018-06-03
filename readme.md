@@ -1,7 +1,6 @@
-#eye_m
-eye_m is an implementation of a mouse that learns to associate 
-eye movement/properties with mouse movement and clicks. After sufficient
-learning, the mouse can be "clicked" with the eye. 
+eye_m uses a machine learning alogoritm to learn to associate 
+eye movement with mouse movement and clicks. After sufficient
+learning, the mouse can be moved and "clicked" with the eye. 
 
 Eye tracking
 	(Implementation in progress) - uses PyGaze and writes data to mysql for 
