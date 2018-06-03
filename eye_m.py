@@ -10,15 +10,14 @@ Author:
 import argparse						# cmd line arg parser
 
 from eye_m_lib import repl
+from eye_m_lib import get_sqlconn
 from eye_m_learn import learn		# eye_m learning module
 from eye_m_mouse import mouse		# eye_m mouse move/click module
 
 #############
 # CONSTANTS #
 #############
-MYSQL_DB = 'localhost'
-MYSQL_USER = 'test'
-MYSQL_PASS = 'test'
+
 
 #############
 # FUNCTIONS #
@@ -43,5 +42,6 @@ if __name__ == '__main__':
 	verbose_mode = args.v
 	run_mode = MODE_MAP[args.mode]
 	run_mode()
+	get_sqlconn()
 	repl()
 	

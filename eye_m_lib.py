@@ -4,6 +4,13 @@ Author:
 	Dustin Fast (dustin.fast@outlook.com), 2018
 """
 
+import MySQLdb
+
+# Constants (TODO: Move to config)
+MYSQL_HOST 	= '127.0.0.1'
+MYSQL_DB 	= 'eye_m'
+MYSQL_USER 	= 'root'
+MYSQL_PASS 	= 'sqldev'
 
 #############
 #  CLASSES  #
@@ -12,8 +19,24 @@ Author:
 #############
 # FUNCTIONS #
 #############
+
+def get_sqlconn():
+	""" Based on defined MYSQL constants, returns:
+			conn	- db connection object
+			cur		- db cursor object
+	"""
+	conn = MySQLdb.connect(host=MYSQL_HOST,
+						   user=MYSQL_USER,  
+						   passwd=MYSQL_PASS,
+						   db=MYSQL_DB )
+	cur = conn.cursor()
+
+	return conn, cur
 		
 def repl():
+	""" Read-Eval-Print-Loop
+	"""
+
 	# Show welcome txt
 	print('Type q to exit, ? for help.')
 
