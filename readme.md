@@ -1,3 +1,4 @@
+# eye_m 
 eye_m uses a machine learning alogoritm to learn to associate 
 eye movement with mouse movement and clicks. After sufficient
 learning, the mouse can be moved and "clicked" with the eye. 
