@@ -20,6 +20,13 @@ MYSQL_PASS 	= 'sqldev'
 # FUNCTIONS #
 #############
 
+def check_dependencies():
+	""" Returns true iff all dependencies installed
+	"""
+	# TODO
+	
+	return True
+
 def get_sqlconn():
 	""" Based on defined MYSQL constants, returns:
 			conn	- db connection object
