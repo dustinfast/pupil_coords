@@ -7,8 +7,6 @@ import numpy as np
 
 NOSE_MODEL = 'models/haarcascade_nose.xml'
 EYE_MODEL = 'models/haarcascade_eye.xml'
-# EYE_MODEL = 'models/haarcascade_eye_tree_eyeglasses.xml'
-# UB_MODEL = 'models/haarcascade_upperbody.xml'
 
 # Load cascade models # TODO: Test l/r eye masks
 try:
@@ -33,6 +31,7 @@ class Face(object):
         self.fail_count = 0
         self.frame_count = 0
         self.max_count = sys.maxint
+        # TODO Depth, etc?
         
         if frame is not None:
             self.frame = frame
@@ -157,7 +156,7 @@ class Face(object):
         # TODO: Erosion? https://docs.opencv.org/3.0-beta/doc/py_tutorials/
         # py_imgproc/py_morphological_ops/py_morphological_ops.html
         frame = cv2.cvtColor(self.frame, cv2.COLOR_RGB2GRAY)
-        hist, bins = np.histogram(frame.flatten(), 256, [0, 256])
+        hist, _ = np.histogram(frame.flatten(), 256, [0, 256])
         cdf = hist.cumsum()
         cdf_normalized = cdf * hist.max() / cdf.max()
         cdf_m = np.ma.masked_equal(cdf, 0)
