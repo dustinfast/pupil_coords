@@ -6,13 +6,15 @@ __author__ = "Dustin Fast (dustin.fast@outlook.com)"
 import MySQLdb
 
 # Constants (TODO: Move to config)
-MYSQL_HOST 	= '127.0.0.1'
-MYSQL_DB 	= 'eye_m'
-MYSQL_USER 	= 'root'
-MYSQL_PASS 	= 'sqldev'
+MYSQL_HOST     = '127.0.0.1'
+MYSQL_DB     = 'eye_m'
+MYSQL_USER     = 'root'
+MYSQL_PASS     = 'sqldev'
 
 
+#############
 #  CLASSES  #
+#############
 
 class Stack:
     """ A stack data structure.
@@ -102,25 +104,26 @@ class Queue:
             lst.append(d)
         return lst
 
-
+#############
 # FUNCTIONS #
+#############
 
 def check_dependencies():
-	""" Returns true iff all dependencies installed.
-	"""
-	# TODO
-	
-	return True
+    """ Returns true iff all dependencies installed.
+    """
+    # TODO
+    
+    return True
 
 def get_sqlconn():
-	""" Based on defined MYSQL constants, returns:
-			conn	- db connection object
-			cur		- db cursor object
-	"""
-	conn = MySQLdb.connect(host=MYSQL_HOST,
-						   user=MYSQL_USER,  
-						   passwd=MYSQL_PASS,
-						   db=MYSQL_DB )
-	cur = conn.cursor()
+    """ Based on defined MYSQL constants, returns:
+            conn    - db connection object
+            cur        - db cursor object
+    """
+    conn = MySQLdb.connect(host=MYSQL_HOST,
+                           user=MYSQL_USER,  
+                           passwd=MYSQL_PASS,
+                           db=MYSQL_DB )
+    cur = conn.cursor()
 
-	return conn, cur
+    return conn, cur
