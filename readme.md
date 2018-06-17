@@ -4,26 +4,26 @@ eye movement with mouse movement and clicks. After sufficient
 learning, the mouse can be moved and "clicked" with the eye. 
 
 Eye tracking
-	(Implementation in progress) - Uses Pygaze's libwebcam
-	(https://github.com/esdalmaijer/PyGaze/)
+    (Implementation in progress) - Uses Pygaze's libwebcam
+    (https://github.com/esdalmaijer/PyGaze/)
 
 Learning is accomplished via an ANN that anazlyzes ..
-	(Implementation in progress)
+    (Implementation in progress)
 
 # Usage
-	python eye_m.py 
-		-h	: Displays command line arguments
+    python eye_m.py 
+        -h    : Displays command line arguments
 
 # Dependencies
 sudo apt-get install opencv-python
 
 On windows w/ubuntu, install webcam via:
-	git clone git://linuxtv.org/media_build.git
-	cd media_build
-	./build
-	sudo make install 
+    git clone git://linuxtv.org/media_build.git
+    cd media_build
+    ./build
+    sudo make install 
 
-	then - 
+    then - 
 
 pip install numpy
 pip install mysqlclient
@@ -34,7 +34,7 @@ http://scikit-learn.org/stable/auto_examples/classification/plot_classifier_comp
 https://downloadcenter.intel.com/download/25044/Intel-RealSense-Depth-Camera-Manager
 
 http://videocapture.sourceforge.net/
-		
+        
 http://www.pygaze.org/2015/06/webcam-eye-tracker/
 
 https://automatetheboringstuff.com/chapter18/
