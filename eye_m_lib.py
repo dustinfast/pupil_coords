@@ -1,4 +1,4 @@
-""" eye_m_lib.py - Class and function lib for eye_m
+""" eye_m_lib.py - Class and function lib.
 """
 
 __author__ = "Dustin Fast (dustin.fast@outlook.com)"
