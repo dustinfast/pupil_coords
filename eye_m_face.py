@@ -1,11 +1,10 @@
 """ eye_face.py. Face class with pupil and nose coords.
 """
 
+import sys
 import cv2
 import numpy as np
-import time
 
-MIRROR_IMG = True
 EYE_MODEL = 'models/haarcascade_eye.xml'
 # EYE_MODEL = 'models/haarcascade_eye_tree_eyeglasses.xml'
 NOSE_MODEL = 'models/haarcascade_nose.xml'
@@ -20,7 +19,10 @@ except:
     raise Exception('Error loading cascade models.')
 
 class Face(object):
+    """ TODO
+    """
     def __init__(self, frame=None):
+        self.cam = cv2.VideoCapture(0)  # ini camera
         self.nose_x = 0
         self.nose_y = 0
         self.l_eye_x = 0
@@ -28,7 +30,8 @@ class Face(object):
         self.r_eye_x = 0
         self.r_eye_y = 0
         self._points = []
-        self.err_count = 0
+        self.fail_count = 0
+        self.frame_count = 0
         
         if frame is not None:
             self.frame = frame
@@ -42,6 +45,12 @@ class Face(object):
         self.frame_opt = img_opt(frame)
         self._points = []
 
+        if self.frame_count - 1 >= sys.maxint:
+            self.frame_count = 0
+            self.fail_count = 0
+            print('Face classifier metrics reset.')
+        self.frame_count += 1
+
         self._set_features()
 
     def _set_features(self):
@@ -51,12 +60,13 @@ class Face(object):
         # Detect facial features
         eyes = g_eye_model.detectMultiScale(self.frame_opt, 1.3, 5)
         nose = g_nose_model.detectMultiScale(self.frame_opt, 1.3, 5)
+        ub = g_ub_model.detectMultiScale(self.frame_opt, 1.3, 5)
 
         # Proceed if both eyes detected
         if not len(eyes) == 2:  
-            print(str(self.err_count) + (': no eyes'))
-            self.err_count += 1
-            if self.err_count > 200:
+            print(str(self.fail_count) + (': no eyes'))
+            self.fail_count += 1
+            if self.fail_count > 200:  # debug
                 exit()
             return
 
@@ -94,6 +104,9 @@ class Face(object):
             self.nose_y = y + z / 2
             self._points.append((self.nose_x, self.nose_y))
 
+        # Mark features on self.frame
+        self._mark_pts()
+
     def __str__(self):
         """ Returns a string representation of self.
         """
@@ -108,20 +121,54 @@ class Face(object):
         
         return ret_str
 
-    def get_marked(self, frame=None):
-        """ Returns the given frame marked with the facial features.
-            If not frame, self.frame is used.
+    def _mark_pts(self):
+        """ Marks self.frame with the facial features.
         """
-        if frame is None:
-            frame = self.frame
         for p in self._points:
-            cv2.circle(frame, (p[0], p[1]), 1, (0, 255, 0), 1)
+            cv2.circle(self.frame, (p[0], p[1]), 1, (0, 255, 0), 1)
 
         # debug
-        # cv2.circle(frame, (self.l_eye_x + 1, self.l_eye_y + 1), 1, (0, 0, 255), 1)
-        # cv2.circle(frame, (self.r_eye_x + 1, self.r_eye_y + 1), 1, (0, 255, 0), 1)
+        # cv2.circle(self.frame, (self.l_eye_x + 1, self.l_eye_y + 1), 1, (0, 0, 255), 1)
+        # cv2.circle(self.frame, (self.r_eye_x + 1, self.r_eye_y + 1), 1, (0, 255, 0), 1)
 
-        return frame
+    def accuracy(self):
+        """ Returns an int representing the percent of successfull eye finds.
+        """
+        a = (self.frame_count - self.fail_count) * 100.0 / self.frame_count
+        return int(a)
+
+    def get(self):
+        """ Processes a single frame. Can be called from within a loop.
+        """
+        pass
+
+    def run(self, window_mode=False):
+        """ Runs the data capture continuously.
+            If window_mode, display frames and allows quit on spacebar.
+        """
+        print('Capturing data...')
+
+        while True:
+            ret, frame = self.cam.read()
+
+            if ret:
+                self._update(frame)
+                print(self.accuracy())
+            else:
+                print('Error reading from camera.')
+
+            if window_mode:
+                cv2.imshow('Output', frame)
+                cv2.imshow('Output2', self.frame_opt)
+
+            if cv2.waitKey(1) == 32:
+                break  # spacebar to quit
+
+        if window_mode:
+            cv2.destroyAllWindows()
+        
+        print('Stopped capturing data.')
+
 
 def img_crop(frame, x, y, w, z):
     """ Given an image frame and x, y, w, z crop coords, returns cropped img.
@@ -134,6 +181,8 @@ def img_opt(frame):
     """
     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
     frame = img_bal_brightness(frame)  # TODO: Find optimal
+
+    # TODO: check heuristics and adjust based on lighting
 
     return frame
 
@@ -153,23 +202,5 @@ def img_bal_brightness(frame):
 
 
 if __name__ == '__main__':
-    print('Starting...')
     face = Face()
-    cam = cv2.VideoCapture(0)
-
-    while True:
-        ret, frame = cam.read()
-        if MIRROR_IMG:
-            frame = cv2.flip(frame, 1)
-        
-        face._update(frame)
-        frame = face.get_marked()
-        # frame = np.hstack((frame, face.pframe))  # put imgs side by side
-
-        cv2.imshow('Output', frame)
-        cv2.imshow('Output2', face.get_marked(face.frame_opt))
-        time.sleep(.1)
-
-        if cv2.waitKey(1) == 32:
-            break  # spacebar to quit
-    cv2.destroyAllWindows()
+    face.run(True)
