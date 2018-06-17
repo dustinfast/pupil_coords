@@ -5,15 +5,17 @@ import cv2
 import numpy as np
 import time
 
-EYE_MODEL = 'models/eyes.xml'
-NOSE_MODEL = 'models/nose.xml'
 MIRROR_IMG = True
+EYE_MODEL = 'models/haarcascade_eye.xml'
+# EYE_MODEL = 'models/haarcascade_eye_tree_eyeglasses.xml'
+NOSE_MODEL = 'models/haarcascade_nose.xml'
+UB_MODEL = 'models/haarcascade_upperbody.xml'
 
 # Load cascade models # TODO: Test l/r eye masks
 try:
     g_eye_model = cv2.CascadeClassifier(EYE_MODEL)
     g_nose_model = cv2.CascadeClassifier(NOSE_MODEL)
-    assert(g_eye_model and g_nose_model)
+    g_ub_model = cv2.CascadeClassifier(UB_MODEL)
 except:
     raise Exception('Error loading cascade models.')
 
@@ -37,8 +39,7 @@ class Face(object):
         if self.frame_mod is None:
             return
 
-        # Optimize the frame for classification
-        # frame_mod = cv2.pyrDown(cv2.pyrDown(frame))  # down sample frame
+        # Optimize frame for classification # TODO: Anything else?
         frame_mod = cv2.cvtColor(self.frame, cv2.COLOR_RGB2GRAY)  # frame->rgb
         frame_mod = balance_brightness(frame_mod)
         self.frame_mod = frame_mod 
@@ -48,19 +49,35 @@ class Face(object):
         nose = g_nose_model.detectMultiScale(frame_mod, 1.3, 5)
 
         # Proceed if both eyes detected
-        # if not len(eyes) == 2:  
-        #     return
+        if not len(eyes) == 2:  
+            return
 
+        # Extract each coord and assign to self
         for i, (x, y, w, z) in enumerate(eyes):
             eye_x = x + w / 2
             eye_y = y + z / 2
-            if i % 2 == 0:
-                self.l_eye_x = eye_x
-                self.l_eye_y = eye_y
+            if i % 2 == 1:
+                eye_1_x = eye_x
+                eye_1_y = eye_y
             else:
-                self.l_eye_x = eye_x
-                self.l_eye_y = eye_y
-            self._points.append((eye_x, eye_y))
+                eye_2_x = eye_x
+                eye_2_y = eye_y
+
+        if eye_1_x < eye_2_x:  # ensure correct eye gets assigned
+            self.l_eye_x = eye_1_x
+            self.l_eye_y = eye_1_y
+            self.r_eye_x = eye_2_x
+            self.r_eye_y = eye_2_y
+        else:
+            self.l_eye_x = eye_2_x
+            self.l_eye_y = eye_2_y
+            self.r_eye_x = eye_1_x
+            self.r_eye_y = eye_1_y
+
+        # TODO: Ensure eyes are reasonably far apart
+
+        self._points.append((self.l_eye_x, self.l_eye_y))
+        self._points.append((self.r_eye_x, self.r_eye_y))
 
         for (x, y, w, z) in nose:
             self.nose_x = x + w / 2
@@ -81,22 +98,18 @@ class Face(object):
         
         return ret_str
 
-    def get_marked(self, frame=None, cross=False):
+    def get_marked(self, frame=None):
         """ Returns the given frame marked with the facial features.
-            If cross, points are with cross, else circles
             If not frame, self.frame is used.
         """
         if frame is None:
             frame = self.frame
         for p in self._points:
-            if cross:
-                x = p[0]
-                y = p[0]
-                # cv2.rectangle(frame, (x, y), ((x+w), (y+h)), (0, 0, 255), 1)
-                cv2.line(frame, (x - 5, y), ((x + 10, y)), (0, 0, 255), 1)
-                cv2.line(frame, (x, y - 5), ((x, y + 10)), (0, 0, 255), 1)
-            else:
-                cv2.circle(frame, (p[0], p[1]), 1, (0, 0, 255), 1)
+            cv2.circle(frame, (p[0], p[1]), 1, (0, 0, 255), 1)
+
+        # debug
+        # cv2.circle(frame, (self.l_eye_x + 1, self.l_eye_y + 1), 1, (0, 0, 255), 1)
+        # cv2.circle(frame, (self.r_eye_x + 1, self.r_eye_y + 1), 1, (0, 255, 0), 1)
 
         return frame
 
