@@ -8,20 +8,16 @@ import numpy as np
 NOSE_MODEL = 'models/haarcascade_nose.xml'
 EYE_MODEL = 'models/haarcascade_eye.xml'
 
-# Load cascade models # TODO: Test l/r eye masks
-try:
-    g_eye_model = cv2.CascadeClassifier(EYE_MODEL)
-    g_nose_model = cv2.CascadeClassifier(NOSE_MODEL)
-    # g_ub_model = cv2.CascadeClassifier(UB_MODEL)
-except:
-    raise Exception('Error loading cascade models.')
-
 class Face(object):
-    """ TODO
+    """ Representation of a face in the form of its nose and pupil coords.
     """
-    def __init__(self, frame=None):
+    def __init__(self, frame=None, eye_model=EYE_MODEL, nose_model=NOSE_MODEL):
+        self.eye_model = cv2.CascadeClassifier(eye_model)
+        self.nose_model = cv2.CascadeClassifier(nose_model)
         self.cam = cv2.VideoCapture(0)  # ini camera
-        self.nose_x = 0  # TODO: Do we need indiv coords like this?
+
+        # TODO: Do I need indiv coords
+        self.nose_x = 0  
         self.nose_y = 0
         self.l_eye_x = 0
         self.l_eye_y = 0
@@ -76,9 +72,8 @@ class Face(object):
             # print(str(self.fail_count) + (': no eyes'))  # debug
 
         # Detect facial features
-        eyes = g_eye_model.detectMultiScale(self.frame_opt, 1.3, 5)
-        nose = g_nose_model.detectMultiScale(self.frame_opt, 1.3, 5)
-        # ub = g_ub_model.detectMultiScale(self.frame_opt, 1.3, 5)
+        eyes = self.eye_model.detectMultiScale(self.frame_opt, 1.3, 5)
+        nose = self.nose_model.detectMultiScale(self.frame_opt, 1.3, 5)
 
         # Proceed if both eyes detected
         if not len(eyes) == 2:  
