@@ -112,7 +112,7 @@ def img_crop(frame, x, y, w, z):
     """ Given an image frame and x, y, w, z crop coords, returns cropped img.
     """
     return frame[y:y + z, x:x + w]  # [Y1:Y2, X1:X2]
-    
+
 
 def check_dependencies():
     """ Returns true iff all dependencies installed.
@@ -129,7 +129,7 @@ def get_sqlconn():
     conn = MySQLdb.connect(host=MYSQL_HOST,
                            user=MYSQL_USER,  
                            passwd=MYSQL_PASS,
-                           db=MYSQL_DB )
+                           db=MYSQL_DB)
     cur = conn.cursor()
 
     return conn, cur
