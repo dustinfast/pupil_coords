@@ -5,16 +5,16 @@ import sys
 import cv2
 import numpy as np
 
+NOSE_MODEL = 'models/haarcascade_nose.xml'
 EYE_MODEL = 'models/haarcascade_eye.xml'
 # EYE_MODEL = 'models/haarcascade_eye_tree_eyeglasses.xml'
-NOSE_MODEL = 'models/haarcascade_nose.xml'
-UB_MODEL = 'models/haarcascade_upperbody.xml'
+# UB_MODEL = 'models/haarcascade_upperbody.xml'
 
 # Load cascade models # TODO: Test l/r eye masks
 try:
     g_eye_model = cv2.CascadeClassifier(EYE_MODEL)
     g_nose_model = cv2.CascadeClassifier(NOSE_MODEL)
-    g_ub_model = cv2.CascadeClassifier(UB_MODEL)
+    # g_ub_model = cv2.CascadeClassifier(UB_MODEL)
 except:
     raise Exception('Error loading cascade models.')
 
@@ -23,15 +23,16 @@ class Face(object):
     """
     def __init__(self, frame=None):
         self.cam = cv2.VideoCapture(0)  # ini camera
-        self.nose_x = 0
+        self.nose_x = 0  # TODO: Do we need indiv coords like this?
         self.nose_y = 0
         self.l_eye_x = 0
         self.l_eye_y = 0
         self.r_eye_x = 0
         self.r_eye_y = 0
-        self._points = []
+        self._points = []           # [ (l_eye_xy), (r_eye_xy), (nose_xy) ]
         self.fail_count = 0
         self.frame_count = 0
+        self.max_count = sys.maxint
         
         if frame is not None:
             self.frame = frame
@@ -45,29 +46,42 @@ class Face(object):
         self.frame_opt = img_opt(frame)
         self._points = []
 
-        if self.frame_count - 1 >= sys.maxint:
+        self._set_features()
+
+        self.frame_count += 1
+        if self.frame_count == self.max_count:
+            print('Resetting accuracy metrics. Last=%' + str(self.accuracy()))
             self.frame_count = 0
             self.fail_count = 0
-            print('Face classifier metrics reset.')
-        self.frame_count += 1
 
-        self._set_features()
+    def _reset_coords(self):
+        """ Sets all feature coords to 0.
+        """
+        self.nose_x = 0
+        self.nose_y = 0
+        self.l_eye_x = 0
+        self.l_eye_y = 0
+        self.r_eye_x = 0
+        self.r_eye_y = 0
+        self._points = []
 
     def _set_features(self):
         """ Sets facial feature coordinates based on self.frame_opt.
             Assumes self.frame_opt is not None.
         """
+        def _fail():
+            self.fail_count += 1
+            self._reset_coords()
+            # print(str(self.fail_count) + (': no eyes'))  # debug
+
         # Detect facial features
         eyes = g_eye_model.detectMultiScale(self.frame_opt, 1.3, 5)
         nose = g_nose_model.detectMultiScale(self.frame_opt, 1.3, 5)
-        ub = g_ub_model.detectMultiScale(self.frame_opt, 1.3, 5)
+        # ub = g_ub_model.detectMultiScale(self.frame_opt, 1.3, 5)
 
         # Proceed if both eyes detected
         if not len(eyes) == 2:  
-            print(str(self.fail_count) + (': no eyes'))
-            self.fail_count += 1
-            if self.fail_count > 200:  # debug
-                exit()
+            _fail()
             return
 
         # Extract each coord and assign to self
@@ -83,14 +97,16 @@ class Face(object):
 
         if eye_1_x < eye_2_x:  # ensure correct eye gets assigned
             if (eye_2_x - eye_1_x) < 20:
-                return  # eyes too close
+                _fail()  # eyes too close together
+                return
             self.l_eye_x = eye_1_x
             self.l_eye_y = eye_1_y
             self.r_eye_x = eye_2_x
             self.r_eye_y = eye_2_y
         else:
             if (eye_1_x - eye_2_x) < 20:
-                return  # eyes too close
+                _fail()  # eyes too close together
+                return
             self.l_eye_x = eye_2_x
             self.l_eye_y = eye_2_y
             self.r_eye_x = eye_1_x
@@ -103,6 +119,7 @@ class Face(object):
             self.nose_x = x + w / 2
             self.nose_y = y + z / 2
             self._points.append((self.nose_x, self.nose_y))
+            break  # Ensure only one nose
 
         # Mark features on self.frame
         self._mark_pts()
@@ -134,40 +151,29 @@ class Face(object):
     def accuracy(self):
         """ Returns an int representing the percent of successfull eye finds.
         """
-        a = (self.frame_count - self.fail_count) * 100.0 / self.frame_count
-        return int(a)
+        acc = (self.frame_count - self.fail_count) * 100.0 / self.frame_count
+        return acc
 
-    def get(self):
-        """ Processes a single frame. Can be called from within a loop.
+    def run_single(self):
+        """ Gets and processes a single frame, then returns the feature points.
         """
-        pass
+        _, frame = self.cam.read()
+        self._update(frame)
 
-    def run(self, window_mode=False):
-        """ Runs the data capture continuously.
-            If window_mode, display frames and allows quit on spacebar.
+        return self._points
+
+    def run_live(self):
+        """ Runs the data capture continuously. Displays frame and frame_opt
+            in a window. Spacebar quits.
         """
-        print('Capturing data...')
-
         while True:
-            ret, frame = self.cam.read()
-
-            if ret:
-                self._update(frame)
-                print(self.accuracy())
-            else:
-                print('Error reading from camera.')
-
-            if window_mode:
-                cv2.imshow('Output', frame)
-                cv2.imshow('Output2', self.frame_opt)
-
+            _, frame = self.cam.read()
+            self._update(frame)
+            cv2.imshow('Output', frame)
+            cv2.imshow('Output2', self.frame_opt)
             if cv2.waitKey(1) == 32:
                 break  # spacebar to quit
-
-        if window_mode:
-            cv2.destroyAllWindows()
-        
-        print('Stopped capturing data.')
+        cv2.destroyAllWindows()
 
 
 def img_crop(frame, x, y, w, z):
@@ -203,4 +209,4 @@ def img_bal_brightness(frame):
 
 if __name__ == '__main__':
     face = Face()
-    face.run(True)
+    face.run_live()
