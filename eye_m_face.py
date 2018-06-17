@@ -36,14 +36,27 @@ class Face(object):
         
         if frame is not None:
             self.frame = frame
-            self.frame_opt = img_opt(frame)
+            self.frame_opt = self._img_opt()
             self._set_features()
     
+    def __str__(self):
+        """ Returns a string representation of self.
+        """
+        ret_str = 'Eyes: '
+        ret_str = str(self.l_eye_x) + ', '
+        ret_str = str(self.l_eye_y) + ', '
+        ret_str = str(self.r_eye_x) + ', '
+        ret_str = str(self.r_eye_y) + ', '
+        ret_str += 'Nose: '
+        ret_str = str(self.nose_y) + ', '
+        ret_str = str(self.nose_y)
+        return ret_str
+
     def _update(self, frame):
         """ Updates the face object with the given frame.
         """
         self.frame = frame
-        self.frame_opt = img_opt(frame)
+        self.frame_opt = self._img_opt()
         self._points = []
 
         self._set_features()
@@ -53,17 +66,6 @@ class Face(object):
             print('Resetting accuracy metrics. Last=%' + str(self.accuracy()))
             self.frame_count = 0
             self.fail_count = 0
-
-    def _reset_coords(self):
-        """ Sets all feature coords to 0.
-        """
-        self.nose_x = 0
-        self.nose_y = 0
-        self.l_eye_x = 0
-        self.l_eye_y = 0
-        self.r_eye_x = 0
-        self.r_eye_y = 0
-        self._points = []
 
     def _set_features(self):
         """ Sets facial feature coordinates based on self.frame_opt.
@@ -124,20 +126,6 @@ class Face(object):
         # Mark features on self.frame
         self._mark_pts()
 
-    def __str__(self):
-        """ Returns a string representation of self.
-        """
-        ret_str = 'Eyes: ' 
-        ret_str = str(self.l_eye_x) + ', '
-        ret_str = str(self.l_eye_y) + ', '
-        ret_str = str(self.r_eye_x) + ', '
-        ret_str = str(self.r_eye_y) + ', '
-        ret_str += 'Nose: '
-        ret_str = str(self.nose_y) + ', '
-        ret_str = str(self.nose_y)
-        
-        return ret_str
-
     def _mark_pts(self):
         """ Marks self.frame with the facial features.
         """
@@ -148,11 +136,40 @@ class Face(object):
         # cv2.circle(self.frame, (self.l_eye_x + 1, self.l_eye_y + 1), 1, (0, 0, 255), 1)
         # cv2.circle(self.frame, (self.r_eye_x + 1, self.r_eye_y + 1), 1, (0, 255, 0), 1)
 
+    def _reset_coords(self):
+        """ Sets all feature coords to 0.
+        """
+        self.nose_x = 0
+        self.nose_y = 0
+        self.l_eye_x = 0
+        self.l_eye_y = 0
+        self.r_eye_x = 0
+        self.r_eye_y = 0
+        self._points = []
+
+    def _img_opt(self):
+        """ Returns a version of self.frame optimzed for classification.
+            Transform is from: https://docs.opencv.org/3.1.0/d5/daf/
+            tutorial_py_histogram_equalization.html
+        """
+        # TODO Optimize heuristics
+        # TODO: check heuristics and adjust based on lighting
+        # TODO: Erosion? https://docs.opencv.org/3.0-beta/doc/py_tutorials/
+        # py_imgproc/py_morphological_ops/py_morphological_ops.html
+        frame = cv2.cvtColor(self.frame, cv2.COLOR_RGB2GRAY)
+        hist, bins = np.histogram(frame.flatten(), 256, [0, 256])
+        cdf = hist.cumsum()
+        cdf_normalized = cdf * hist.max() / cdf.max()
+        cdf_m = np.ma.masked_equal(cdf, 0)
+        cdf_m = (cdf_m - cdf_m.min()) * 255 / (cdf_m.max() - cdf_m.min())
+        cdf = np.ma.filled(cdf_m, 0).astype('uint8')
+
+        return cdf[frame]
+
     def accuracy(self):
         """ Returns an int representing the percent of successfull eye finds.
         """
-        acc = (self.frame_count - self.fail_count) * 100.0 / self.frame_count
-        return acc
+        return (self.frame_count - self.fail_count) * 100.0 / self.frame_count
 
     def run_single(self):
         """ Gets and processes a single frame, then returns the feature points.
@@ -169,42 +186,11 @@ class Face(object):
         while True:
             _, frame = self.cam.read()
             self._update(frame)
-            cv2.imshow('Output', frame)
-            cv2.imshow('Output2', self.frame_opt)
+            cv2.imshow('frame', frame)
+            cv2.imshow('optimzed frame', self.frame_opt)
             if cv2.waitKey(1) == 32:
                 break  # spacebar to quit
         cv2.destroyAllWindows()
-
-
-def img_crop(frame, x, y, w, z):
-    """ Given an image frame and x, y, w, z crop coords, returns cropped img.
-    """
-    return frame[y:y + z, x:x + w]  # [Y1:Y2, X1:X2]
-
-
-def img_opt(frame):
-    """ given an image frame, returns an optimzed version for classification.
-    """
-    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-    frame = img_bal_brightness(frame)  # TODO: Find optimal
-
-    # TODO: check heuristics and adjust based on lighting
-
-    return frame
-
-
-def img_bal_brightness(frame):
-    """ Apply transform to even out brightness.
-        From: https://docs.opencv.org/3.1.0/d5/daf/
-        tutorial_py_histogram_equalization.html
-    """
-    hist, bins = np.histogram(frame.flatten(), 256, [0, 256])
-    cdf = hist.cumsum()
-    cdf_normalized = cdf * hist.max() / cdf.max()
-    cdf_m = np.ma.masked_equal(cdf, 0)
-    cdf_m = (cdf_m - cdf_m.min()) * 255 / (cdf_m.max() - cdf_m.min())
-    cdf = np.ma.filled(cdf_m, 0).astype('uint8')
-    return cdf[frame]
 
 
 if __name__ == '__main__':
