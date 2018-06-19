@@ -1,4 +1,9 @@
-""" eye_face.py. Face class with pupil and nose coords.
+""" eye_face.py. The Eyes detection class - Uses OpenCV to find users face 
+    via the webcam and notes coordinates of their pupil and nose.
+    A live mode, Eyes.run() displays these coords overlaid on live output.
+    An on-demand mode processes frames as requested and returns the coords.
+
+    Author: Dustin Fast (dustin.fast@outlook.com)
 """
 
 import sys
@@ -9,8 +14,9 @@ from random import randint
 N_MODEL = 'models/haarcascade_nose.xml'
 E_MODEL = 'models/haarcascade_eye.xml'
 
-class Face(object):
+class Eyes(object):
     """ Representation of a face in the form of its nose and pupil coords.
+        Contains image optimzation and feature detection methods.
     """
     def __init__(self, eye_model=E_MODEL, nose_model=N_MODEL):
         self.eye_model = cv2.CascadeClassifier(eye_model)
@@ -48,7 +54,7 @@ class Face(object):
         return ret_str
 
     def _update(self):
-        """ Updates the face object with the given frame according to the best
+        """ Updates the eyes object with the given frame according to the best
             optimization combination it can find.
         """
         _, self.frame = self.cam.read()  # Get cam data
@@ -241,5 +247,5 @@ class Face(object):
 
 
 if __name__ == '__main__':
-    face = Face()
-    face.run_live()
+    eyes = Eyes()
+    eyes.run_live()
