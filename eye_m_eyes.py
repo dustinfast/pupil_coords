@@ -14,6 +14,9 @@ from random import randint
 N_MODEL = 'models/haarcascade_nose.xml'
 E_MODEL = 'models/haarcascade_eye.xml'
 
+class Eye(object):
+    #TODO
+
 class Eyes(object):
     """ Representation of a face in the form of its nose and pupil coords.
         Contains image optimzation and feature detection methods.
@@ -32,10 +35,10 @@ class Eyes(object):
         self.r_eye_x = 0
         self.r_eye_y = 0
         self._points = []           # [(le_x, le_y), (re_x, re_y), (n_x, n_y)]
-        self.fails = 0              # Classificatoin failures
-        self.frame_count = 0        # Classification attempts
-        self.max_frames = 5         # Attempts before determine accuracy
-        self.acc = 0                # Accuracy, as a percentage
+        self.frame_count = 0        # num frames, reset when == acc_denom
+        self.fails = 0              # Find failures, reset when == acc_denom
+        self.acc_denom = 10         # The denominator used to calc accuracy
+        self.acc_curr = 0           # Current accuracy (as a percentage)
         self.prev_acc = 0           # Prev accuracy percentage
         self.mask = 0               # Optimation mask
         # TODO Depth, etc?
@@ -64,36 +67,12 @@ class Eyes(object):
         self._mark_pts()
 
         self.frame_count += 1
-        if self.frame_count == self.max_frames:
-            self.prev_acc = self.acc
-            self.acc = int((self.max_frames - self.fails) * 100.0 / self.max_frames)
+        if self.frame_count == self.acc_denom:
+            self.acc_curr = _set_acc()int((self.acc_denom - self.fails) * 100.0 / self.acc_denom)
             self.frame_count = 0
             self.fails = 0
 
-            # Do hill climb to find best optimzation if needed
-            print('Curr: ' + str(self.acc) + ', Prev: ' + str(self.prev_acc))
-            if self.acc == 0 or self.acc + 5 < self.prev_acc:
-                print('Looking for new best mask')
-                masks = {}
-                masks[self.acc] = self.mask # Include current mask in results
-
-                # For max_frames diff masks
-                for i in range(self.max_frames):
-                    temp_mask = self._optimize_frame()
-                    fails = 0
-                    print('Temp mask: ' + str("{0:b}".format(self.mask)))
-                    
-                    # Try curr mask on max_frames frames
-                    for j in range(self.max_frames):
-                        _, self.frame = self.cam.read()  # Get cam data
-                        if not self._find_features():
-                            fails += 1
-                    acc = int((self.max_frames - fails) * 100.0 / self.max_frames)
-                    masks[acc] = temp_mask
-                best = sorted(masks.keys())[0]
-                self.mask = masks[best]
-                print('New best: ' + str(best) + str("{0:b}".format(self.mask)))
-
+            
 
     def _find_features(self):
         """ Returns True iff facial feature coordinates were found.
