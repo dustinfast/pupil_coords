@@ -43,6 +43,12 @@ class mouse(object):
         else:
             print('Mouse Thread: Off')
 
-	def mouse_pos():
+    @staticmethod
+    def mouse_pos():
 		x, y = win32api.GetCursorPos()
 		return x, y
+
+
+if __name__ == '__main__':
+    print(mouse.mouse_pos())
+    
