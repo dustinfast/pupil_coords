@@ -104,13 +104,24 @@ class FindEyes(object):
         """ Returns a version of self.frame with current optimizations applied.
         """
         frame = cv2.cvtColor(self.frame, cv2.COLOR_RGB2GRAY)  # frame->grayscale
-        if self.gamma_tbl is not None:
-            frame = cv2.LUT(frame, self.gamma_tbl)
+
+        # CLAHE optimize # Better with varying 
+        # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        # frame = clahe.apply(frame)
+
+        # cv2 optimize
+        # frame = cv2.equalizeHist(frame) 
+
+        # custom gamma/alpha/beta
+        # if self.gamma_tbl is not None:
+        #     frame = cv2.LUT(frame, self.gamma_tbl)
         return frame
 
     def _find_new_opt(self, mask=None):
         """ Returns a version of self.frame adjusted for current lighting conds.
         """
+        print('optimzing...')
+        return
         max_tries = 10
         max_gamma = 3.0
         mix_gamma = 0.0
@@ -119,15 +130,14 @@ class FindEyes(object):
         max_beta = 20.0
         min_beta = -20.0
 
-        prev_alpah = self.alpha     
-        prev_beta = self.beta      
+        prev_alpah = self.alpha
+        prev_beta = self.beta
         prev_gamme = self.gamma
         
         # ?
         # frame = cv2.cvtColor(self.frame, cv2.COLOR_RGB2GRAY)  # frame->grayscale
 
         gamma_step = .25
-        print('optimzing...')
         # Hill climb by modifying varying alpha and beta
         # for i in range(max_tries):
         self.gamma = 1.0 / (self.gamma * gamma_step)
@@ -283,7 +293,7 @@ class FindEyes(object):
             print(self.acc_curr)
             if cv2.waitKey(1) == 32:
                 break  # spacebar to quit
-            time.sleep(.1)
+            # time.sleep(.1)
         cv2.destroyAllWindows()
 
 
