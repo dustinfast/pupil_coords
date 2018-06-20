@@ -18,6 +18,3 @@ pip install numpy
 pip install mysqlclient
 
 http://scikit-learn.org/stable/auto_examples/classification/plot_classifier_comparison.html#sphx-glr-auto-examples-classification-plot-classifier-comparison-py
-
-https://automatetheboringstuff.com/chapter18/
-https://stackoverflow.com/questions/25848951/python-get-mouse-x-y-position-on-click
