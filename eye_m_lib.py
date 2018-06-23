@@ -115,6 +115,7 @@ def img_crop(frame, x, y, w, z):
 def img_find_optimization(self, mask=None):
     """ Given an image and lighting conds, returns, finds optimal optimzaton.
     """
+    # TODO: optimal image opt
     # alpha = 1.0        # Frame contrast applied
     # beta = 0           # Frame brightness applied
     # gamma = 1          # Frame gamma correction applied
@@ -124,12 +125,20 @@ def img_find_optimization(self, mask=None):
     # frame = cv2.erode(frame, kern, iterations=1)
     # frame = cv2.dilate(frame, kern, iterations=1)
 
-    # CLAHE optimize # Better with varying
+    # CLAHE optimize # Pretty good?
     # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     # frame = clahe.apply(frame)
 
     # cv2 optimize
     # frame = cv2.equalizeHist(frame)
+
+    # Histogram analysis
+    # hist, _ = np.histogram(frame.flatten(), 256, [0, 256])
+    # cdf = hist.cumsum()
+    # cdf_normalized = cdf * hist.max() / cdf.max()
+    # cdf_m = np.ma.masked_equal(cdf, 0)
+    # cdf_m = (cdf_m - cdf_m.min()) * 255 / (cdf_m.max() - cdf_m.min())
+    # cdf = np.ma.filled(cdf_m, 0).astype('uint8')
     pass
 
 
@@ -140,7 +149,7 @@ def img_find_optimization(self, mask=None):
 def check_dependencies():
     """ Returns true iff all dependencies installed.
     """
-    # TODO
+    # TODO: check_dependencies()
     
     return True
 
