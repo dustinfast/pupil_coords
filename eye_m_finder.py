@@ -8,10 +8,11 @@ __author__ = "Dustin Fast (dustin.fast@outlook.com)"
 
 import sys
 import cv2
+import datetime
 import numpy as np
 from time import sleep
-from eye_m_lib import Face
-from eye_m_lib import Queue
+from eye_m_classlib import Face
+from eye_m_classlib import Queue
 
 # Cascade models for cv2 classifiers
 EYE_HAAR = 'models/haarcascade_eye.xml'
@@ -23,6 +24,7 @@ LINE = cv2.LINE_AA
 
 # MISC
 ACCURACY_DENOM = 100
+CAMERA_ID = 0
 
 
 class Finder(object):
@@ -34,12 +36,12 @@ class Finder(object):
         # Classifier
         self.eye_model = cv2.CascadeClassifier(eye_model)
         self.nose_model = cv2.CascadeClassifier(nose_model)
-        self.camera = cv2.VideoCapture(0)
-        self.live_mode = False  # If live mode, we do _mark_frame()
-        self.face = Face()      # Face object. Contains coords, etc.
-        self.frame = None       # Curr camera frame
+        self._camera = None
+        self._do_extras = False  # Allow no accuracy or mark_frame, for perf
+        self.face = Face()       # Face object. Contains coords, etc.
+        self.frame = None        # Curr camera frame
 
-        # Last 50 results (as bools). For accuracy calculation.
+        # Last 50 results (as bools), for accuracy calculation
         self.results = Queue(maxsize=ACCURACY_DENOM)
 
         # Optimized frame
@@ -49,18 +51,19 @@ class Finder(object):
     def _update(self):
         """ Does an iteration of eye finding and updates self accordingly
         """
-        _, self.frame = self.camera.read()
+        _, self.frame = self._camera.read()
         self.frame_opt = self._optimize_frame()
         self._reset_coords()
 
-        if self._find_eyes():
-            self.results.shove(True)
-        else:
-            self.results.shove(False)
+        self.success = self._find_eyes()
 
-        # Mark frame with coords and diag info if in live mode
-        if self.live_mode:
-            self._mark_frame()  
+        # If do_extras enabled, adjust accuracy metrics and mark frame
+        if self. _do_extras:
+            if self.success:
+                self.results.shove(True)
+            else:
+                self.results.shove(False)
+            self._mark_frame()
 
     def _optimize_frame(self):
         """ Returns a version of self.frame with current optimizations applied.
@@ -124,7 +127,7 @@ class Finder(object):
         cv2.putText(self.frame, txt, (10, 20), FONT, 0.4, (0, 0, 255), 1, LINE)
 
         # Add each face point to frame
-        for p in self.face.points():
+        for p in self.face.as_points():
             cv2.circle(self.frame, (p[0], p[1]), 1, (0, 255, 0), 1)
 
     def _reset_coords(self):
@@ -149,36 +152,29 @@ class Finder(object):
         for b in [b for b in self.results.items if b]:
             finds += 1
         return finds / denom * 100
-        
-
-    def _balance(self, frame):
-        """ Given a frame, returns a version with milder gradients.
-        """
-        hist, _ = np.histogram(frame.flatten(), 256, [0, 256])
-        cdf = hist.cumsum()
-        cdf_normalized = cdf * hist.max() / cdf.max()
-        cdf_m = np.ma.masked_equal(cdf, 0)
-        cdf_m = (cdf_m - cdf_m.min()) * 255 / (cdf_m.max() - cdf_m.min())
-        cdf = np.ma.filled(cdf_m, 0).astype('uint8')
-        return cdf[frame]
 
     def run_single(self, showframe=False):
         """ Gets and processes a single frame, then returns a Face object.
             Optionally displays frames (handy for debugging).
         """
+        self._do_extras = showframe
+        self._camera = cv2.VideoCapture(CAMERA_ID)  # TODO: Perf?
         self._update()
+        self._camera.release()
 
         if self.success:
             if showframe:
                 cv2.imshow('frame', self.frame)
-                cv2.imshow('optimzed frame', self.frame_opt)
+                cv2.imshow('optimized frame', self.frame_opt)
             return self.face
+        else:
 
     def run_live(self, fps=0.015):  # fps=.03 -> 30fps, fps=.015 -> 60fps
             """ Runs the data capture continuously. Displays frame and frame_opt
                 in a window. Spacebar quits.
             """
-            self.live_mode = True
+            self._camera = cv2.VideoCapture(CAMERA_ID)
+            self._do_extras = True
             while True:
                 self._update()
                 cv2.imshow('frame', self.frame)
@@ -187,7 +183,8 @@ class Finder(object):
                     break  # spacebar to quit
                 sleep(fps)  # ~ 60 FPS
             cv2.destroyAllWindows()
-            self.live_mode = False
+            self._do_extras = False
+            self._camera.release()
 
 
 if __name__ == '__main__':
