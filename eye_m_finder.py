@@ -2,17 +2,16 @@
     face via the webcam and note coordinates of pupils and nose.
     A live mode, Eyes.run() displays these coords overlaid on live output.
     An on-demand mode processes frames as requested and returns the coords.
-
-    Author: Dustin Fast (dustin.fast@outlook.com)
 """
+__author__ = "Dustin Fast (dustin.fast@outlook.com)"
+
 
 import sys
 import cv2
-import time
 import numpy as np
 from time import sleep
+from eye_m_lib import Face
 from eye_m_lib import Queue
-from random import randint
 
 # Cascade models for cv2 classifiers
 EYE_HAAR = 'models/haarcascade_eye.xml'
@@ -189,42 +188,6 @@ class Finder(object):
                 sleep(fps)  # ~ 60 FPS
             cv2.destroyAllWindows()
             self.live_mode = False
-
-
-class Face(object):
-    """ The user's pupil and nose coordinates and other related information.
-    """
-    def __init__(self):
-        self.nose_x = -1
-        self.nose_y = -1
-        self.l_eye_x = -1
-        self.l_eye_y = -1
-        self.r_eye_x = -1
-        self.r_eye_y = -1
-        self.depth = -1  # TODO
-        self.blink = -1  # TODO
-
-    def __str__(self):
-        ret_str = 'l_eye: ('
-        ret_str += str(self.l_eye_x) + ', '
-        ret_str += str(self.l_eye_y) + ')\n '
-        ret_str += 'r_eye: ( '
-        ret_str += str(self.r_eye_x) + ', '
-        ret_str += str(self.r_eye_y) + ')\n'
-        ret_str += 'nose: ('
-        ret_str += str(self.nose_y) + ', '
-        ret_str += str(self.nose_y) + ')'
-        return ret_str
-
-    def points(self):
-        """ Returns a list of two-tuples containing the facial feature coords:
-            [ (l_eye x/y), (r_eye x/y), (nose x/y) ]
-        """
-        pts = []
-        pts.append((self.l_eye_x, self.l_eye_y))
-        pts.append((self.r_eye_x, self.r_eye_y))
-        pts.append((self.nose_x, self.nose_y))
-        return pts
 
 
 if __name__ == '__main__':

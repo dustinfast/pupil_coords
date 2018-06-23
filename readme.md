@@ -16,8 +16,8 @@ Learning is accomplished via an ANN that anazlyzes ..
 
 ## Dependencies
 
-sudo apt-get install opencv-python
-pip install numpy
-pip install mysqlclient
+opencv - sudo apt-get install opencv-python
+numpy - pip install numpy
+mysqlclient - pip install mysqlclient
 
 http://scikit-learn.org/stable/auto_examples/classification/plot_classifier_comparison.html#sphx-glr-auto-examples-classification-plot-classifier-comparison-py
