@@ -15,11 +15,7 @@ Learning is accomplished via an ANN that anazlyzes ..
         -h    : Displays command line arguments
 
 ## Dependencies
+see setup.py
 
-opencv - sudo apt-get install opencv-python
-numpy - pip install numpy
-mysqlclient - pip install mysqlclient
-pythoncom - pip install pypiwin32
-pyhook - in dependencies
 
 http://scikit-learn.org/stable/auto_examples/classification/plot_classifier_comparison.html#sphx-glr-auto-examples-classification-plot-classifier-comparison-py

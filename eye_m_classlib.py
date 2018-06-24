@@ -1,4 +1,4 @@
-""" Class library for eye_m_mouse.py """
+""" Class library for eye_m.py """
 
 __author__ = "Dustin Fast (dustin.fast@outlook.com)"
 
