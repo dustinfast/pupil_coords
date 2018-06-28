@@ -3,6 +3,8 @@
 
 __author__ = "Dustin Fast (dustin.fast@outlook.com)"
 
+
+# from datetime import datetime
 from eye_m_learn import Learner
 from eye_m_finder import Finder
 from eye_m_classlib import Mouse
@@ -27,7 +29,7 @@ def start():
     # Start mousing after sufficient learning
 
     # Wait for quit and do cleanup
-    uinput = raw_input('Press Enter to quit...')
+    raw_input("Running... Press Enter to quit.\n")
     mouse.click_watch.terminate()
     mouse.click_watch.join()
 

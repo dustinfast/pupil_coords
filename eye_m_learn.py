@@ -5,7 +5,7 @@ __author__ = "Dustin Fast (dustin.fast@outlook.com)"
 
 import multiprocessing as mp
 # from eye_m_lib import Queue
-from eye_m_classlib import Face
+# from eye_m_classlib import Face
 
 
 class Learner(object):
@@ -24,7 +24,7 @@ class Learner(object):
         """
         print('Received data: ' + str(data))
 
-    def give_data(data):
+    def give_data(self, data):
         """ Accepts data item (in dictionary form), or a list of data items,
             and starts the learn process on it.
         """

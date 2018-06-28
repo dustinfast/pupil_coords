@@ -6,10 +6,7 @@
 __author__ = "Dustin Fast (dustin.fast@outlook.com)"
 
 
-import sys
 import cv2
-import datetime
-import numpy as np
 from time import sleep
 from eye_m_classlib import Face
 from eye_m_classlib import Queue
@@ -19,8 +16,8 @@ EYE_HAAR = 'models/haarcascade_eye.xml'
 NOSE_HAAR = 'models/haarcascade_nose.xml'
 
 # Frame display txt
-FONT = cv2.FONT_HERSHEY_SIMPLEX
-LINE = cv2.LINE_AA
+# FONT = cv2.FONT_HERSHEY_SIMPLEX
+# LINE = cv2.LINE
 
 # MISC
 ACCURACY_DENOM = 100
@@ -58,7 +55,7 @@ class Finder(object):
         self.success = self._find_eyes()
 
         # If do_extras enabled, adjust accuracy metrics and mark frame
-        if self. _do_extras:
+        if self._do_extras:
             if self.success:
                 self.results.shove(True)
             else:
@@ -123,8 +120,8 @@ class Finder(object):
         """ Marks self.frame with the facial feature coords, accuracy, etc.
         """ 
         # Add curr ID accuracy to frame
-        txt = 'ID Rate: ' + str(self.accuracy()) + '%'
-        cv2.putText(self.frame, txt, (10, 20), FONT, 0.4, (0, 0, 255), 1, LINE)
+        # txt = 'ID Rate: ' + str(self.accuracy()) + '%'
+        # cv2.putText(self.frame, txt, (10, 20), FONT, 0.4, (0, 0, 255), 1, LINE)
 
         # Add each face point to frame
         for p in self.face.as_points():
@@ -167,7 +164,6 @@ class Finder(object):
                 cv2.imshow('frame', self.frame)
                 cv2.imshow('optimized frame', self.frame_opt)
             return self.face
-        else:
 
     def run_live(self, fps=0.015):  # fps=.03 -> 30fps, fps=.015 -> 60fps
             """ Runs the data capture continuously. Displays frame and frame_opt
@@ -188,5 +184,5 @@ class Finder(object):
 
 
 if __name__ == '__main__':
-   finder = Finder()
-   finder.run_live()
+    finder = Finder()
+    finder.run_live()

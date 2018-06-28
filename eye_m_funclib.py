@@ -3,13 +3,13 @@
 
 __author__ = "Dustin Fast (dustin.fast@outlook.com)"
 
-# import MySQLdb
+import MySQLdb
 
-# # Constants (TODO: Move to config)
-# MYSQL_HOST = '127.0.0.1'
-# MYSQL_DB   = 'eye_m'
-# MYSQL_USER = 'root'
-# MYSQL_PASS = 'sqldev'
+# Constants
+MYSQL_HOST = '127.0.0.1'
+MYSQL_DB = 'eye_m'
+MYSQL_USER = 'root'
+MYSQL_PASS = 'sqldev'
 
 
 #############
