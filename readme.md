@@ -18,4 +18,15 @@ Learning is accomplished via an ANN that anazlyzes ..
 see setup.py
 
 
+DB:
+event: click or keypress
+device orientation: x, y, z
+orig img size: x, y
+face rectangle: x, y
+nose: x, y
+ears: x, y
+pupils: x, y
+pupil shapes: r, l
+
+
 http://scikit-learn.org/stable/auto_examples/classification/plot_classifier_comparison.html#sphx-glr-auto-examples-classification-plot-classifier-comparison-py
