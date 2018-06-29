@@ -25,6 +25,13 @@ using Windows.UI.Xaml.Shapes;
 using Windows.Media.FaceAnalysis;
 using Windows.UI;
 
+using System.Runtime.InteropServices;
+using System.Threading;
+using Windows.Media;
+using Windows.System.Display;
+using Windows.UI.Xaml.Input;
+using Windows.UI.Xaml.Media.Imaging;
+
 
 namespace flogger
 {
@@ -43,7 +50,6 @@ namespace flogger
 
         // Face detection and data logging
         private FaceDetectionEffect _faceDetectionEffect;
-        private StorageFolder _captureFolder = null;
         private bool _loggingActive = false;
 
 
@@ -51,17 +57,16 @@ namespace flogger
         public MainPage()
         {
             this.InitializeComponent();
-            NavigationCacheMode = NavigationCacheMode.Disabled;  // Disable UI cahching on suspend/navigate
+            NavigationCacheMode = NavigationCacheMode.Disabled;
 
             // Register handlers for camera init/cleanup on suspend/resume
             Application.Current.Suspending += Application_Suspending;
             Application.Current.Resuming += Application_Resuming;
         }
 
-        /// Init UI
+        /// Init and Cleanup UI
         private async Task SetupUiAsync()
         {
-            // Lock page to landscape orientation
             DisplayInformation.AutoRotationPreferences = DisplayOrientations.Landscape;
 
             // Get current display orientation 
@@ -72,13 +77,7 @@ namespace flogger
             // Register for orientation updates # TODO: Device vs Display orientation?
             if (_orientationSensor != null)
                 _orientationSensor.OrientationChanged += OrientationSensor_OrientationChanged;
-
-            // Init img save location
-            var picturesLibrary = await StorageLibrary.GetLibraryAsync(KnownLibraryId.Pictures);
-            _captureFolder = picturesLibrary.SaveFolder ?? ApplicationData.Current.LocalFolder;
         }
-
-        /// Clean up UI
         private void CleanupUiAsync()
         {
             // Unregister Event Handlers
@@ -88,24 +87,22 @@ namespace flogger
             DisplayInformation.AutoRotationPreferences = DisplayOrientations.None;  // Unlock screen orientation
         }
 
-        /// Init MediaCapture, get webcam, start preview, and start face detecting
+        /// Find camera, init MediaCapture, start preview and start face detecting.
         private async Task InitializeCameraAsync()
         {
             Debug.WriteLine("Initializing Camera.");
             if (_mediaCapture == null)
             {
-                // Init camera, favoring the front panel cam
+                // Find a camera, favoring the front panel cam
                 var allVideoDevices = await DeviceInformation.FindAllAsync(DeviceClass.VideoCapture);
                 var cameraDevice = allVideoDevices.FirstOrDefault();
 
                 if (cameraDevice == null)
                     throw new System.InvalidOperationException("Application requires a webcam but none found.");
 
-                // Create MediaCapture and its settings
+                // Init MediaCapture
                 _mediaCapture = new MediaCapture();
                 var settings = new MediaCaptureInitializationSettings { VideoDeviceId = cameraDevice.Id };
-
-                // Init MediaCapture
                 try
                 {
                     await _mediaCapture.InitializeAsync(settings);
@@ -116,53 +113,92 @@ namespace flogger
                     throw new System.InvalidOperationException("Application requires a webcam but was denied access.");
                 }
 
-                Debug.WriteLine("Preview Started.");
-                PreviewControl.Source = _mediaCapture;
-                await _mediaCapture.StartPreviewAsync();
-                _previewProperties = _mediaCapture.VideoDeviceController.GetMediaStreamProperties(MediaStreamType.VideoPreview);
                 FaceDetectionButton_Click(null, null);  // Start face detection
             }
         }
 
-        /// Stops the preview stream
+
+        /// Start/Stop the preview stream
+        private async Task StartPreviewAsync()
+        {
+            PreviewControl.Source = _mediaCapture;
+            await _mediaCapture.StartPreviewAsync();
+            _previewProperties = _mediaCapture.VideoDeviceController.GetMediaStreamProperties(MediaStreamType.VideoPreview);
+            Debug.WriteLine("Preview Started.");
+        }
         private async Task StopPreviewAsync()
         {
-            // Stop the preview
             _previewProperties = null;
             await _mediaCapture.StopPreviewAsync();
 
-            // Use the dispatcher because this method is sometimes called from non-UI threads
             await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
             {
                 PreviewControl.Source = null; // UI Cleanup
             });
         }
 
-        /// Takes a photo to a StorageFile and adds rotation metadata to it
+        /// Saves a photo of the preview frame
         private async Task TakePhotoAsync()
         {
-            var stream = new InMemoryRandomAccessStream();
+            // Img save location
+            var picturesLibrary = await StorageLibrary.GetLibraryAsync(KnownLibraryId.Pictures);
+            StorageFolder _captureFolder = ApplicationData.Current.LocalFolder;
+            var file = await _captureFolder.CreateFileAsync("PreviewFrame.jpg", CreationCollisionOption.GenerateUniqueName);
 
-            Debug.WriteLine("Taking photo...");
+
+
+            // TODO: Get frame with overlay instead of without
+            var stream = new InMemoryRandomAccessStream();
             await _mediaCapture.CapturePhotoToStreamAsync(ImageEncodingProperties.CreateJpeg(), stream);
 
-            try
+            using (var inputStream = stream)
             {
-                var file = await _captureFolder.CreateFileAsync("imgcap.jpg", CreationCollisionOption.GenerateUniqueName);
-                await ReencodeAndSavePhotoAsync(stream, file, PhotoOrientation.Normal);
-                Debug.WriteLine("Photo saved to " + file.Path);
+                var decoder = await BitmapDecoder.CreateAsync(inputStream);
+                using (var outputStream = await file.OpenAsync(FileAccessMode.ReadWrite))
+                {
+                    var encoder = await BitmapEncoder.CreateForTranscodingAsync(outputStream, decoder);
+                    var properties = new BitmapPropertySet { { "System.Photo.Orientation", new BitmapTypedValue(PhotoOrientation.Normal, PropertyType.UInt16) } };
+                    await encoder.BitmapProperties.SetPropertiesAsync(properties);
+                    await encoder.FlushAsync();
+                }
             }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("Exception writing img: " + ex.ToString());
-            }
+            Debug.WriteLine("Photo saved to " + file.Path);
+
+
+            //BMP
+            //https://github.com/Microsoft/Windows-universal-samples/blob/master/Samples/CameraGetPreviewFrame/cs/MainPage.xaml.cs
+            //private static readonly SemaphoreSlim _mediaCaptureLifeLock = new SemaphoreSlim(1);
+            //await _mediaCaptureLifeLock.WaitAsync(); ?
+            //var previewProperties = _mediaCapture.VideoDeviceController.GetMediaStreamProperties(MediaStreamType.VideoPreview) as VideoEncodingProperties;
+            //var videoFrame = new VideoFrame(BitmapPixelFormat.Bgra8, (int)previewProperties.Width, (int)previewProperties.Height);
+
+            //using (var currentFrame = await _mediaCapture.GetPreviewFrameAsync(videoFrame))
+            //{
+            //    // Collect the resulting frame and show text on page
+            //    SoftwareBitmap previewFrame = currentFrame.SoftwareBitmap;
+            //    FrameInfoTextBlock.Text = String.Format("{0}x{1} {2}", previewFrame.PixelWidth, previewFrame.PixelHeight, previewFrame.BitmapPixelFormat);
+            //    // Create a SoftwareBitmapSource to display the SoftwareBitmap to the user
+            //    var sbSource = new SoftwareBitmapSource();
+            //    await sbSource.SetBitmapAsync(previewFrame);
+            //    PreviewFrameImage.Source = sbSource;
+
+            //    using (var outputStream = await file.OpenAsync(FileAccessMode.ReadWrite))
+            //    {
+            //        var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.JpegEncoderId, outputStream);
+
+            //        // Grab the data from the SoftwareBitmap
+            //        encoder.SetSoftwareBitmap(previewFrame);
+            //        await encoder.FlushAsync();
+            //    }
+            //}
+            //await _mediaCaptureLifeLock.Release(); ?
+
         }
 
         /// Cleans up the camera resources
         private async Task CleanupCameraAsync()
         {
             Debug.WriteLine("CleanupCameraAsync");
-
             if (_isInitialized)
             {
                 if (_faceDetectionEffect != null)
@@ -188,22 +224,6 @@ namespace flogger
             _deviceOrientation = args.Orientation;
         }
 
-        /// Saves the given photo stream to the given StorageFile
-        private static async Task ReencodeAndSavePhotoAsync(IRandomAccessStream stream, StorageFile file, PhotoOrientation photoOrientation)
-        {
-            using (var inputStream = stream)
-            {
-                var decoder = await BitmapDecoder.CreateAsync(inputStream);
-
-                using (var outputStream = await file.OpenAsync(FileAccessMode.ReadWrite))
-                {
-                    var encoder = await BitmapEncoder.CreateForTranscodingAsync(outputStream, decoder);
-                    var properties = new BitmapPropertySet { { "System.Photo.Orientation", new BitmapTypedValue(photoOrientation, PropertyType.UInt16) } };
-                    await encoder.BitmapProperties.SetPropertiesAsync(properties);
-                    await encoder.FlushAsync();
-                }
-            }
-        }
 
         /////////////////////////////////////////////        
         //Face detection.
@@ -214,10 +234,10 @@ namespace flogger
             await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => HighlightDetectedFaces(args.ResultFrame.DetectedFaces));
         }
 
-        /// Adds Rectangles around the given faces to the FacesCanvas as a face bounding boxes
+        /// Adds Rectangles around the given faces to the PreviewOverlay as a face bounding boxes
         private void HighlightDetectedFaces(IReadOnlyList<DetectedFace> faces)
         {
-            FacesCanvas.Children.Clear();  // Remove any previos rects from canvas
+            PreviewOverlay.Children.Clear();  // Remove any previos rects from canvas
 
             // Iterate faces
             for (int i = 0; i < faces.Count; i++)
@@ -229,7 +249,7 @@ namespace flogger
                 faceBoundingBox.StrokeThickness = 2;
                 faceBoundingBox.Stroke = (i == 0 ? new SolidColorBrush(Colors.Blue) : new SolidColorBrush(Colors.DeepSkyBlue));
 
-                FacesCanvas.Children.Add(faceBoundingBox);  // Add rects to canvas
+                PreviewOverlay.Children.Add(faceBoundingBox);  // Add rects to canvas
             }
 
             /// Rotate face rects as necessary, according to display orientation.
@@ -251,15 +271,15 @@ namespace flogger
             }
 
             var transform = new RotateTransform { Angle = rotationDegrees };
-            FacesCanvas.RenderTransform = transform;
+            PreviewOverlay.RenderTransform = transform;
 
             var previewArea = GetPreviewStreamRectInControl(_previewProperties as VideoEncodingProperties, PreviewControl);
 
-            FacesCanvas.Width = previewArea.Width;
-            FacesCanvas.Height = previewArea.Height;
+            PreviewOverlay.Width = previewArea.Width;
+            PreviewOverlay.Height = previewArea.Height;
 
-            Canvas.SetLeft(FacesCanvas, previewArea.X);
-            Canvas.SetTop(FacesCanvas, previewArea.Y);
+            Canvas.SetLeft(PreviewOverlay, previewArea.X);
+            Canvas.SetTop(PreviewOverlay, previewArea.Y);
         }
 
         /// Adds face detection to the preview stream, registers for its events, enables it, and gets the FaceDetectionEffect instance
@@ -378,14 +398,43 @@ namespace flogger
             return result;
         }
 
+
         /////////////////////////
         /// Btn click handlers
+        
+        // Start or stop Normal Camera 
+        private async void FaceDetectionButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_faceDetectionEffect == null || !_faceDetectionEffect.Enabled)
+            {
+                await StartPreviewAsync();
+                await CreateFaceDetectionEffectAsync();
+            }
+            else
+            {
+                await CleanUpFaceDetectionEffectAsync();
+                await StopPreviewAsync();
+            }
+            PreviewOverlay.Children.Clear();  // Clear any existing face rects
+        }
+
         private async void PhotoButton_Click(object sender, RoutedEventArgs e)
         {
             await TakePhotoAsync();
             Debug.WriteLine("PhotoBtnClicked");
         }
 
+        // Start or stop IR camera
+        private async void IRModeButton_Click(object sender, RoutedEventArgs e)
+        {
+            Debug.WriteLine("IRBtnClicked");
+            //this.Frame.Navigate(typeof(BlankPage1));
+
+            //await StartPreviewAsync();
+            await GetPreviewFrameAsD3DSurfaceAsync();
+            //await StopPreviewAsync();
+
+        }
         // Start or stop data logging
         private void LoggerButton_Click(object sender, RoutedEventArgs e)
         {
@@ -396,14 +445,38 @@ namespace flogger
                 _loggingActive = false;
         }
 
-        // Start or stop face detection
-        private async void FaceDetectionButton_Click(object sender, RoutedEventArgs e)
+        
+
+        ///////////////////////////////////
+        /// Get Preview Frame Handlers
+        
+        private async Task GetPreviewFrameAsD3DSurfaceAsync()
         {
-            if (_faceDetectionEffect == null || !_faceDetectionEffect.Enabled)
-                await CreateFaceDetectionEffectAsync();
-            else
-                await CleanUpFaceDetectionEffectAsync();
-            FacesCanvas.Children.Clear();  // Clear any existing face rects
+            // Capture the preview frame as a D3D surface
+            using (var currentFrame = await _mediaCapture.GetPreviewFrameAsync())
+            {
+                // Check that the Direct3DSurface isn't null. It's possible that the device does not support getting the frame
+                // as a D3D surface
+                if (currentFrame.Direct3DSurface != null)
+                {
+                    // Collect the resulting frame
+                    var surface = currentFrame.Direct3DSurface;
+
+                    // Show the frame information
+                    FrameInfoTextBlock.Text = String.Format("{0}x{1} {2}", surface.Description.Width, surface.Description.Height, surface.Description.Format);
+                    Debug.WriteLine("Got 3D Frame");
+                }
+                else // Fall back to software bitmap
+                {
+                    Debug.WriteLine("Could not get 3D Frame");
+
+                    SoftwareBitmap previewFrame = currentFrame.SoftwareBitmap;
+                    FrameInfoTextBlock.Text = String.Format("{0}x{1} {2}", previewFrame.PixelWidth, previewFrame.PixelHeight, previewFrame.BitmapPixelFormat);
+                }
+               
+                // Clear the image
+                PreviewControl.Source = null;
+            }
         }
 
         ///////////////////////////////
@@ -445,6 +518,7 @@ namespace flogger
             await CleanupCameraAsync();
             CleanupUiAsync();
         }
+
     }
 }
 

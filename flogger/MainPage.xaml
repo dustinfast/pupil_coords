@@ -28,25 +28,24 @@
             </Style>
         </Grid.Resources>
 
-
+        
         <!--Camera preview-->
         <CaptureElement Name="PreviewControl" Stretch="Uniform"/>
+        
+        <!--Captured preview frame image-->
+        <!--<Image Name="PreviewFrameImage"/>-->
 
         <Canvas>
-            <!--Canvas that will host the face detection bounding boxes, will share the same bounds as the preview within the CaptureElement-->
-            <!--It's contained inside of another canvas to allow for adjusting its size and position after applying a RenderTransform -->
-            <!--For more details, see SetFacesCanvasRotation-->
-            <Canvas Name="FacesCanvas" RenderTransformOrigin="0.5,0.5"/>
+            <!--Preview Image overlay canvases - same outter bounds as CaptureElement. Inner canvas can be resized-->
+            <Canvas Name="PreviewOverlay" RenderTransformOrigin="0.5,0.5"/>
         </Canvas>
-
 
         <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center">
             <!--TODO: 'Turn off preview' btn. Exit btn-->
             <Button Name="FaceDetectionButton" Click="FaceDetectionButton_Click" IsEnabled="True">
                 <Viewbox>
                     <Grid>
-                        <SymbolIcon Name="FaceDetectionDisabledIcon" Symbol="Contact" Visibility="Visible"/>
-                        <SymbolIcon Name="FaceDetectionEnabledIcon" Symbol="Contact2" Visibility="Collapsed"/>
+                        <SymbolIcon Symbol="Contact2"/>
                     </Grid>
                 </Viewbox>
             </Button>
@@ -57,10 +56,15 @@
             </Button>
             <Button Name="LoggerButton" Click="LoggerButton_Click" IsEnabled="True">
                 <Grid>
-                    <Ellipse x:Name="StartLoggingIcon" Fill="Red" Width="20" Height="20"/>
-                    <Rectangle x:Name="StopLoggingIcon" Fill="White" Width="20" Height="20" Visibility="Collapsed"/>
+                    <Ellipse x:Name="LoggerIcon" Fill="White" Width="20" Height="20"/>
                 </Grid>
             </Button>
+            <Button Name="IRModeButton" Click="IRModeButton_Click" IsEnabled="True">
+                <Grid>
+                    <SymbolIcon Symbol="Crop"/>
+                </Grid>
+            </Button>
+            <TextBlock Name="FrameInfoTextBlock" VerticalAlignment="Center"/>
         </StackPanel>
     </Grid>
 </Page>
