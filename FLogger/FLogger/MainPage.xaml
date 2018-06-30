@@ -37,13 +37,14 @@
         <!--<Image Name="PreviewFrameImage"/>-->
 
         <Canvas>
-            <!--Preview Image overlay canvases - same outter bounds as CaptureElement. Inner canvas can be resized-->
+            <!--Preview Image overlay canvases.
+                Has same outter bounds as CaptureElement. Inner canvas can be resized. -->
             <Canvas Name="PreviewOverlay" RenderTransformOrigin="0.5,0.5"/>
         </Canvas>
 
         <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center">
             
-            <Button Name="PreviewStreamToggleBtn" Click="PreviewStreamToggleBtn_Click" IsEnabled="True">
+            <Button Name="PreviewStreamToggle" Click="PreviewStreamToggle_Click" IsEnabled="True">
                 <Viewbox>
                     <Grid>
                         <SymbolIcon Name="PreviewStreamOnIcon" Symbol="Contact" Visibility="Visible"/>
@@ -52,25 +53,24 @@
                 </Viewbox>
             </Button>
 
-            <Button Name="IRModeToggleBtn" Click="IRModeToggleBtn_Click" IsEnabled="True">
+            <Button Name="IRModeToggle" Click="IRModeToggle_Click" IsEnabled="True">
                 <Grid>
                     <SymbolIcon Name="IRModeOnIcon" Symbol="Crop" Visibility="Visible"/>
                     <SymbolIcon Name="IRModeOffIcon" Symbol="Crop" Visibility="Visible"/>
                 </Grid>
             </Button>
 
+            <Button Name="DataLogToggle" Click="DataLogToggle_Click" IsEnabled="True">
+                <Grid>
+                    <Ellipse x:Name="DataLogOnIcon" Fill="White" Width="20" Height="20"/>
+                    <Ellipse x:Name="DataLogOffIcon" Fill="White" Width="20" Height="20"/>
+                </Grid>
+            </Button>
 
             <Button Name="PhotoButton" Click="PhotoButton_Click" IsEnabled="True">
                 <Viewbox>
                     <SymbolIcon Symbol="Camera"/>
                 </Viewbox>
-            </Button>
-
-            <Button Name="DataLogToggleBtn" Click="DataLogToggleBtn_Click" IsEnabled="True">
-                <Grid>
-                    <Ellipse x:Name="DataLogOnIcon" Fill="White" Width="20" Height="20"/>
-                    <Ellipse x:Name="DataLogOffIcon" Fill="White" Width="20" Height="20"/>
-                </Grid>
             </Button>
 
             <Button Name="ExitBtn" Click="ExitBtn_Click" IsEnabled="True">

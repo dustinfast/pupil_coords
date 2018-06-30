@@ -26,6 +26,7 @@ using Windows.UI;
 using Windows.ApplicationModel.Core;
 using Windows.Media.Capture.Frames;
 
+
 namespace FLogger
 {
     public sealed partial class MainPage : Page
@@ -35,19 +36,16 @@ namespace FLogger
         // TODO: private readonly LightSensor _lightSensor = LightSensor.GetDefault();
         // TODO" private raeadonly ProximitySensor _prixSensor = ProximitySensor.GetDefault();
 
-        // MediaCapture
+        // Misc
         private MediaCapture _mediaCapture;
         private IMediaEncodingProperties _previewProperties;
-
-        // Ptrs
         private FaceDetectionEffect _faceDetectionEffect = null;
+        private MediaFrameSourceKind _camMode = MediaFrameSourceKind.Infrared;
 
         // State Flags
-        private bool _videoReady = false;
+        private bool _videoOn = false;
         private bool _dataLogOn = false;
         private bool _previewOn = false;
-        private bool _IRModeOn = false;
-        private bool _colorModeOn = false;
 
         // Containers
         private List<object> _data = new List<object>();
@@ -61,66 +59,67 @@ namespace FLogger
             // Register handlers for camera init and cleanup on suspend/resume
             Application.Current.Suspending += Application_Suspending;
             Application.Current.Resuming += Application_Resuming;
-
-            // TODO: Determine hardware capabilities and disable UI options accordingly
         }
 
 
-        /// Btn click handlers /////
+        /// Button click handlers /////
 
-        // Face Detection toggle
-        private async void PreviewStreamToggleBtn_Click(object sender, RoutedEventArgs e)
+        // IR camera mode toggle
+        private async void IRModeToggle_Click(object sender, RoutedEventArgs e)
         {
-            if (_faceDetectionEffect == null || !_faceDetectionEffect.Enabled)
+            if (_camMode != MediaFrameSourceKind.Infrared)
             {
-                await StartPreviewAsync();
-                await FaceDetectOnAsync();
+                _camMode = MediaFrameSourceKind.Infrared;
+                await InitCamAsync(_camMode);
             }
             else
             {
-                await FaceDetectOffAsync();
-                await StopPreviewAsync();
+                _camMode = MediaFrameSourceKind.Color;
+                await InitCamAsync(_camMode);
+
             }
 
             UpdateUIControls();
         }
 
-        // Preview Capture btn click
+        // Preview stream toggle
+        private async void PreviewStreamToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_videoOn)
+                return;
+
+            // if (_faceDetectionEffect == null || !_faceDetectionEffect.Enabled)
+            if (!_previewOn)
+            {
+                await StartPreviewAsync();
+                _previewOn = true;
+            }
+            else
+            {
+                await StopPreviewAsync();
+                _previewOn = false;
+            }
+
+            UpdateUIControls();
+        }
+
+        // Frame Capture btn click
         private async void PhotoButton_Click(object sender, RoutedEventArgs e)
         {
+            if (!_videoOn)
+                return;
+
             await TakePhotoAsync();
-            Debug.WriteLine("PhotoBtnClicked");
         }
 
         // Data logging toggle
-        private void DataLogToggleBtn_Click(object sender, RoutedEventArgs e)
+        private void DataLogToggle_Click(object sender, RoutedEventArgs e)
         {
             Debug.WriteLine("LoggerBtnClicked");
-            if (_dataLogOn == false)
+            if (!_dataLogOn)
                 _dataLogOn = true;
             else
                 _dataLogOn = false;
-        }
-
-        // IR camera mode toggle
-        private async void IRModeToggleBtn_Click(object sender, RoutedEventArgs e)
-        {
-            Debug.WriteLine("IRBtnClicked");
-            if (!_IRModeOn)
-            {
-                await ChangeCamModeAsync(MediaFrameSourceKind.Infrared);
-
-            }
-            else
-            {
-                await ChangeCamModeAsync(MediaFrameSourceKind.Color);
-            }
-
-            //this.Frame.Navigate(typeof(BlankPage1));
-
-            //await StartPreviewAsync();
-            //await GetPreviewFrameAsD3DSurfaceAsync();
-            //await StopPreviewAsync();
 
             UpdateUIControls();
         }
@@ -129,7 +128,7 @@ namespace FLogger
         private async void ExitBtn_Click(object sender, RoutedEventArgs e)
         {
             //Do cleanup and exit
-            await ReleaseSensorsAsync();
+            await ReleaseCamAsync();
             await StopPreviewAsync();
 
             CoreApplication.Exit();
@@ -138,37 +137,32 @@ namespace FLogger
 
         /// State and Mode toggle handlers /////
          
-        // Set the camera mode to the requested type
-        private async Task ChangeCamModeAsync(MediaFrameSourceKind type)
+        // Setup the camera and init MediaCapture in the desired mode
+        private async Task InitCamAsync(MediaFrameSourceKind mode)
         {
-            if (type != MediaFrameSourceKind.Color && type != MediaFrameSourceKind.Infrared)
+            if (mode != MediaFrameSourceKind.Color && mode != MediaFrameSourceKind.Infrared)
                 throw new System.InvalidOperationException("ERROR: An unsupported camera mode was requested.");
 
-            //await FaceDetectOffAsync();
-            //await StopPreviewAsync();
+            if (_videoOn)
+                await ReleaseCamAsync();
 
-            var allGroups = await MediaFrameSourceGroup.FindAllAsync();
+            var frameGroups = await MediaFrameSourceGroup.FindAllAsync();
 
             // For each source kind, find all sources of the kind we're interested in
-            var eligibleGroups = allGroups.Select(g => new
+            var eligibleGroups = frameGroups.Select(g => new
             {
                 Group = g,
                 SourceInfos = new MediaFrameSourceInfo[]
                 {
-                    g.SourceInfos.FirstOrDefault(info => info.SourceKind == type)
+                    g.SourceInfos.FirstOrDefault(info => info.SourceKind == mode)
                 }
             }).Where(g => g.SourceInfos.Any(info => info != null)).ToList();
 
             // Error if no cam 
             if (eligibleGroups.Count == 0)
-                throw new System.InvalidOperationException("ERROR: Could not find a color or IR camera.");
+                throw new System.InvalidOperationException("ERROR: Could not find a supported camera.");
 
-
-            var selectedGroupIndex = 0; // Select the first eligible group
-            MediaFrameSourceGroup selectedGroup = eligibleGroups[selectedGroupIndex].Group;
-            MediaFrameSourceInfo colorSourceInfo = eligibleGroups[selectedGroupIndex].SourceInfos[0];
-            MediaFrameSourceInfo infraredSourceInfo = eligibleGroups[selectedGroupIndex].SourceInfos[1];
-            MediaFrameSourceInfo depthSourceInfo = eligibleGroups[selectedGroupIndex].SourceInfos[2];
+            MediaFrameSourceGroup selectedGroup = eligibleGroups[0].Group;
 
             var settings = new MediaCaptureInitializationSettings()
             {
@@ -179,85 +173,22 @@ namespace FLogger
             };
             try
             {
-                //await _mediaCapture.InitializeAsync(settings);
+                _mediaCapture = new MediaCapture();
+                await _mediaCapture.InitializeAsync(settings);
+                _videoOn = true;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("MediaCapture initialization failed: " + ex.Message);
+                Debug.WriteLine("MediaCapture initialization failed: " + ex.Message);
                 return;
             }
-
-            //// Init MediaCapture
-            //_mediaCapture = new MediaCapture();
-            //var settings = new MediaCaptureInitializationSettings { VideoDeviceId = cameraDevice.Id };
-            //try
-            //{
-            //    await _mediaCapture.InitializeAsync(settings);
-            //    _videoReady = true;
-            //}
-            //catch (UnauthorizedAccessException)
-            //{
-            //    throw new System.InvalidOperationException("Application requires a webcam but was denied access.");
-            //}
-
-            //await StartPreviewAsync();
-            //await FaceDetectOnAsync();
         }
 
-        public void InitMediaCaptureAsync()
+        /// Release camera and MediaCapture
+        private async Task ReleaseCamAsync()
         {
-
-        }
-
-        /// Find optical and orientation sensors, init MediaCapture, and start preview and face detection.
-        private async Task InitSensorsAsync()
-        {
-            Debug.WriteLine("Sensor initing...");
-
-            // Camera and Media Capture
-            if (_mediaCapture == null)
-            {
-                // Find camera, favoring the front panel cam
-                var allVideoDevices = await DeviceInformation.FindAllAsync(DeviceClass.VideoCapture);
-                var cameraDevice = allVideoDevices.FirstOrDefault();
-
-                if (cameraDevice == null)
-                    throw new System.InvalidOperationException("Application requires a webcam but none found.");
-
-                // Init MediaCapture
-                _mediaCapture = new MediaCapture();
-                var settings = new MediaCaptureInitializationSettings { VideoDeviceId = cameraDevice.Id };
-                try
-                {
-                    await _mediaCapture.InitializeAsync(settings);
-                    _videoReady = true;
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    throw new System.InvalidOperationException("Application requires a webcam but was denied access.");
-                }
-            }
-
-            // Calibrate Magnetometer if no confidence
-            var acc = _inclineSensor.GetCurrentReading().YawAccuracy;
-            Debug.WriteLine("Mag Accuracy: " + acc.ToString());
-            if (acc != MagnetometerAccuracy.High)
-            {
-                CalibrationBar calibrationBar = new CalibrationBar();
-                calibrationBar.RequestCalibration(MagnetometerAccuracy.Unreliable);  // TODO: Not working
-                calibrationBar.Hide();
-                acc = _inclineSensor.GetCurrentReading().YawAccuracy;
-                Debug.WriteLine("New Mag Accuracy: " + acc.ToString());
-            }
-
-            PreviewStreamToggleBtn_Click(null, null);  // Start face detection
-        }
-
-        /// Release sensors
-        private async Task ReleaseSensorsAsync()
-        {
-            Debug.WriteLine("ReleaseSensorsAsync");
-            if (_videoReady)
+            Debug.WriteLine("ReleaseCamAsync");
+            if (_videoOn)
             {
                 if (_faceDetectionEffect != null)
                     await FaceDetectOffAsync();
@@ -265,7 +196,7 @@ namespace FLogger
                 if (_previewProperties != null)
                     await StopPreviewAsync();
 
-                _videoReady = false;
+                _videoOn = false;
             }
 
             if (_mediaCapture != null)
@@ -455,6 +386,18 @@ namespace FLogger
                            "Conf: " + reading.YawAccuracy.ToString();
             Debug.WriteLine(ostr);
 
+            // // Calibrate Magnetometer if no confidence
+            // var acc = _inclineSensor.GetCurrentReading().YawAccuracy;
+            // Debug.WriteLine("Mag Accuracy: " + acc.ToString());
+            // if (acc != MagnetometerAccuracy.High)
+            // {
+            //     CalibrationBar calibrationBar = new CalibrationBar();
+            //     calibrationBar.RequestCalibration(MagnetometerAccuracy.Unreliable);  // TODO: Not working
+            //     calibrationBar.Hide();
+            //     acc = _inclineSensor.GetCurrentReading().YawAccuracy;
+            //     Debug.WriteLine("New Mag Accuracy: " + acc.ToString());
+            // }
+
             return reading;
         }
         
@@ -513,8 +456,7 @@ namespace FLogger
             //await _mediaCaptureLifeLock.Release(); ?
         }
 
-
-        /// Get Preview Frame a a 3d Surface
+        /// Get Preview Frame as a 3d Surface
         private async Task GetPreviewFrameAsD3DSurfaceAsync()
         {
             // Capture the preview frame as a D3D surface
@@ -553,9 +495,9 @@ namespace FLogger
             //PhotoButton.IsEnabled = _previewProperties != null;
 
             // Update toggle icons based on current mode
-            PreviewStreamOnIcon.Visibility = (_faceDetectionEffect == null || !_faceDetectionEffect.Enabled) ? Visibility.Visible : Visibility.Collapsed;
-            PreviewStreamOffIcon.Visibility = (_faceDetectionEffect != null && _faceDetectionEffect.Enabled) ? Visibility.Visible : Visibility.Collapsed;
-            //StartRecordingIcon.Visibility = _isRecording ? Visibility.Collapsed : Visibility.Visible;
+            //PreviewStreamOnIcon.Visibility = (_faceDetectionEffect == null || !_faceDetectionEffect.Enabled) ? Visibility.Visible : Visibility.Collapsed;
+            //PreviewStreamOffIcon.Visibility = (_faceDetectionEffect != null && _faceDetectionEffect.Enabled) ? Visibility.Visible : Visibility.Collapsed;
+            ////StartRecordingIcon.Visibility = _isRecording ? Visibility.Collapsed : Visibility.Visible;
             //StopRecordingIcon.Visibility = _isRecording ? Visibility.Visible : Visibility.Collapsed;
 
             // Hide the face detection canvas and clear it
@@ -573,7 +515,7 @@ namespace FLogger
             {
                 Debug.WriteLine("Suspending...");
                 var deferral = e.SuspendingOperation.GetDeferral();
-                await ReleaseSensorsAsync();
+                await ReleaseCamAsync();
                 deferral.Complete();
             }
         }
@@ -583,7 +525,7 @@ namespace FLogger
             // Handle global application events only if this page is active
             if (Frame.CurrentSourcePageType == typeof(MainPage))
             {
-                await InitSensorsAsync();
+                await InitCamAsync(_camMode);
                 Debug.WriteLine("Resumed from suspend");
             }
         }
@@ -593,13 +535,13 @@ namespace FLogger
         protected override async void OnNavigatedTo(NavigationEventArgs e)
         {
             Debug.WriteLine("Navigated To");
-            await InitSensorsAsync();
+            await InitCamAsync(_camMode);
         }
 
         protected override async void OnNavigatingFrom(NavigatingCancelEventArgs e)
         {
             Debug.WriteLine("Navigated From");
-            await ReleaseSensorsAsync();
+            await ReleaseCamAsync();
         }
 
         
@@ -624,9 +566,9 @@ namespace FLogger
 //             // Otherwise if it is not initialized, it is being brought into focus.
 //             if (sender.SoundLevel == SoundLevel.Muted)
 //            {
-//                await ReleaseSensorsAsync();
+//                await ReleaseCamAsync();
 //            }
-//            else if (!_videoReady)
+//            else if (!_videoOn)
 //            {
 //                await InitSensorsAsync();
 //            }
