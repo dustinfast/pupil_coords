@@ -1,4 +1,4 @@
-*.py[cod]
+
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
@@ -9,7 +9,9 @@
 bld/
 [Oo]bj/
 bin/
-*.com
+.vs/
+
+*.py[cod]*.com
 *.class
 *.dll
 *.exe
