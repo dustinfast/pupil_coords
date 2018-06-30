@@ -2,7 +2,7 @@
 
 eye_m is a machine vision and learning system that attempts to model the relation of the users gaze with the coordinates of mouse clicks. After sufficient learning, the user can perform mouse clicks at a desired screen position by simply looking at the location and entering some convenient keyboard shortcut.
 
-# Information Collected
+## Information Collected
 
 eye_m does not currently log any information, however it accesses the user's webcam (including infrared, if available) and device orientation sensors to perform learning based onthe following information:  
 Coordinates and shape of the user's left and right pupil and iris (the shape is useful because the cameras perceives the iris as more of an oval when we look to the right of the screen).
@@ -10,7 +10,6 @@ Coordinates of the user's nose.
 Distance from camera to face (if depth perception available).
 Device orientation (x, y, z) in space.
 Mouse click coordinates.
-
 
 ## Development Status
 
@@ -40,7 +39,7 @@ Learning is accomplished via an ANN that anazlyzes ..
 
 ## Dependencies
 
-see setup.py
+See setup.py
 
 
 ## Data Fields
@@ -58,3 +57,4 @@ pupil shapes: r, l
 
 "Define action" mode: action-tag data for +-x minutes.
 Keylearning: In addition to modeling gaze on mouse click, also learn by analyzing gaze information as the user types.
+AutoCorrect: Learn a user-defined facial gesture to asynchronously autocorrect the spelling of their last misspelled word.
