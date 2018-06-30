@@ -8,6 +8,7 @@
 [Bb]uild/
 bld/
 [Oo]bj/
+bin/
 *.com
 *.class
 *.dll
@@ -16,5 +17,5 @@ bld/
 *.dll.config
 *.cache
 *.suo
-bin/
-obj/
+*.pfx
+

@@ -1,0 +1,70 @@
+﻿<Page
+    x:Class="FLogger.MainPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:FLogger"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Page.Resources>
+        <SolidColorBrush x:Key="TranslucentBlackBrush" Color="Black" Opacity="0.3"/>
+    </Page.Resources>
+
+    <Grid>
+        <Grid.Resources>
+            <Style TargetType="Button">
+                <Setter Property="Margin" Value="10,40"/>
+                <Setter Property="MinWidth" Value="80"/>
+                <Setter Property="MinHeight" Value="80"/>
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="Background" Value="{StaticResource TranslucentBlackBrush}"/>
+                <Setter Property="BorderBrush" Value="White"/>
+                <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            </Style>
+            <Style TargetType="Viewbox">
+                <Setter Property="MaxHeight" Value="40"/>
+                <Setter Property="MaxWidth" Value="40"/>
+            </Style>
+        </Grid.Resources>
+
+        
+        <!--Camera preview-->
+        <CaptureElement Name="PreviewControl" Stretch="Uniform"/>
+        
+        <!--Captured preview frame image-->
+        <!--<Image Name="PreviewFrameImage"/>-->
+
+        <Canvas>
+            <!--Preview Image overlay canvases - same outter bounds as CaptureElement. Inner canvas can be resized-->
+            <Canvas Name="PreviewOverlay" RenderTransformOrigin="0.5,0.5"/>
+        </Canvas>
+
+        <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center">
+            <!--TODO: 'Turn off preview' btn. Exit btn-->
+            <Button Name="FaceDetectionButton" Click="FaceDetectionButton_Click" IsEnabled="True">
+                <Viewbox>
+                    <Grid>
+                        <SymbolIcon Symbol="Contact2"/>
+                    </Grid>
+                </Viewbox>
+            </Button>
+            <Button Name="PhotoButton" Click="PhotoButton_Click" IsEnabled="True">
+                <Viewbox>
+                    <SymbolIcon Symbol="Camera"/>
+                </Viewbox>
+            </Button>
+            <Button Name="LoggerButton" Click="LoggerButton_Click" IsEnabled="True">
+                <Grid>
+                    <Ellipse x:Name="LoggerIcon" Fill="White" Width="20" Height="20"/>
+                </Grid>
+            </Button>
+            <Button Name="IRModeButton" Click="IRModeButton_Click" IsEnabled="True">
+                <Grid>
+                    <SymbolIcon Symbol="Crop"/>
+                </Grid>
+            </Button>
+            <TextBlock Name="FrameInfoTextBlock" VerticalAlignment="Center"/>
+        </StackPanel>
+    </Grid>
+</Page>
