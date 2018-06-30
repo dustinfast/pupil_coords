@@ -24,6 +24,7 @@ using Windows.UI.Xaml.Shapes;
 using Windows.Media.FaceAnalysis;
 using Windows.UI;
 using Windows.ApplicationModel.Core;
+using Windows.Media.Capture.Frames;
 
 namespace FLogger
 {
@@ -31,7 +32,8 @@ namespace FLogger
     {
         // Sensors
         private readonly Inclinometer _inclineSensor = Inclinometer.GetDefault();
-        //private readonly LightSensor _lightSensor = LightSensor.GetDefault();  // TODO: Light Sensor?
+        // TODO: private readonly LightSensor _lightSensor = LightSensor.GetDefault();
+        // TODO" private raeadonly ProximitySensor _prixSensor = ProximitySensor.GetDefault();
 
         // MediaCapture
         private MediaCapture _mediaCapture;
@@ -40,10 +42,12 @@ namespace FLogger
         // Ptrs
         private FaceDetectionEffect _faceDetectionEffect = null;
 
-        // Flags
+        // State Flags
         private bool _videoReady = false;
         private bool _dataLogOn = false;
+        private bool _previewOn = false;
         private bool _IRModeOn = false;
+        private bool _colorModeOn = false;
 
         // Containers
         private List<object> _data = new List<object>();
@@ -57,13 +61,15 @@ namespace FLogger
             // Register handlers for camera init and cleanup on suspend/resume
             Application.Current.Suspending += Application_Suspending;
             Application.Current.Resuming += Application_Resuming;
+
+            // TODO: Determine hardware capabilities and disable UI options accordingly
         }
 
 
         /// Btn click handlers /////
 
         // Face Detection toggle
-        private async void FaceDetectToggleBtn_Click(object sender, RoutedEventArgs e)
+        private async void PreviewStreamToggleBtn_Click(object sender, RoutedEventArgs e)
         {
             if (_faceDetectionEffect == null || !_faceDetectionEffect.Enabled)
             {
@@ -97,18 +103,17 @@ namespace FLogger
         }
 
         // IR camera mode toggle
-        private void IRModeToggleBtn_Click(object sender, RoutedEventArgs e)
+        private async void IRModeToggleBtn_Click(object sender, RoutedEventArgs e)
         {
             Debug.WriteLine("IRBtnClicked");
             if (!_IRModeOn)
             {
-            //    await StartPreviewAsync();
-            //    await FaceDetectOnAsync();
-            //}
-            //else
-            //{
-            //    await FaceDetectOffAsync();
-            //    await StopPreviewAsync();
+                await ChangeCamModeAsync(MediaFrameSourceKind.Infrared);
+
+            }
+            else
+            {
+                await ChangeCamModeAsync(MediaFrameSourceKind.Color);
             }
 
             //this.Frame.Navigate(typeof(BlankPage1));
@@ -131,7 +136,78 @@ namespace FLogger
         }
 
 
-        /// State toggle handlers /////
+        /// State and Mode toggle handlers /////
+         
+        // Set the camera mode to the requested type
+        private async Task ChangeCamModeAsync(MediaFrameSourceKind type)
+        {
+            if (type != MediaFrameSourceKind.Color && type != MediaFrameSourceKind.Infrared)
+                throw new System.InvalidOperationException("ERROR: An unsupported camera mode was requested.");
+
+            //await FaceDetectOffAsync();
+            //await StopPreviewAsync();
+
+            var allGroups = await MediaFrameSourceGroup.FindAllAsync();
+
+            // For each source kind, find all sources of the kind we're interested in
+            var eligibleGroups = allGroups.Select(g => new
+            {
+                Group = g,
+                SourceInfos = new MediaFrameSourceInfo[]
+                {
+                    g.SourceInfos.FirstOrDefault(info => info.SourceKind == type)
+                }
+            }).Where(g => g.SourceInfos.Any(info => info != null)).ToList();
+
+            // Error if no cam 
+            if (eligibleGroups.Count == 0)
+                throw new System.InvalidOperationException("ERROR: Could not find a color or IR camera.");
+
+
+            var selectedGroupIndex = 0; // Select the first eligible group
+            MediaFrameSourceGroup selectedGroup = eligibleGroups[selectedGroupIndex].Group;
+            MediaFrameSourceInfo colorSourceInfo = eligibleGroups[selectedGroupIndex].SourceInfos[0];
+            MediaFrameSourceInfo infraredSourceInfo = eligibleGroups[selectedGroupIndex].SourceInfos[1];
+            MediaFrameSourceInfo depthSourceInfo = eligibleGroups[selectedGroupIndex].SourceInfos[2];
+
+            var settings = new MediaCaptureInitializationSettings()
+            {
+                SourceGroup = selectedGroup,
+                SharingMode = MediaCaptureSharingMode.ExclusiveControl,
+                MemoryPreference = MediaCaptureMemoryPreference.Cpu,
+                StreamingCaptureMode = StreamingCaptureMode.Video
+            };
+            try
+            {
+                //await _mediaCapture.InitializeAsync(settings);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("MediaCapture initialization failed: " + ex.Message);
+                return;
+            }
+
+            //// Init MediaCapture
+            //_mediaCapture = new MediaCapture();
+            //var settings = new MediaCaptureInitializationSettings { VideoDeviceId = cameraDevice.Id };
+            //try
+            //{
+            //    await _mediaCapture.InitializeAsync(settings);
+            //    _videoReady = true;
+            //}
+            //catch (UnauthorizedAccessException)
+            //{
+            //    throw new System.InvalidOperationException("Application requires a webcam but was denied access.");
+            //}
+
+            //await StartPreviewAsync();
+            //await FaceDetectOnAsync();
+        }
+
+        public void InitMediaCaptureAsync()
+        {
+
+        }
 
         /// Find optical and orientation sensors, init MediaCapture, and start preview and face detection.
         private async Task InitSensorsAsync()
@@ -174,7 +250,7 @@ namespace FLogger
                 Debug.WriteLine("New Mag Accuracy: " + acc.ToString());
             }
 
-            FaceDetectToggleBtn_Click(null, null);  // Start face detection
+            PreviewStreamToggleBtn_Click(null, null);  // Start face detection
         }
 
         /// Release sensors
@@ -378,32 +454,10 @@ namespace FLogger
                            "Yaw: " + String.Format("{0,5:0.00}", reading.YawDegrees) + ". " +
                            "Conf: " + reading.YawAccuracy.ToString();
             Debug.WriteLine(ostr);
-            
-            // TODO: Test Quaternion vals
-            //OrientationSensorReading reading = e.Reading;
-
-            //// Quaternion values
-            //SensorQuaternion quaternion = reading.Quaternion;   // get a reference to the object to avoid re-creating it for each access
-            //ScenarioOutput_X.Text = String.Format("{0,8:0.00000}", quaternion.X);
-            //ScenarioOutput_Y.Text = String.Format("{0,8:0.00000}", quaternion.Y);
-            //ScenarioOutput_Z.Text = String.Format("{0,8:0.00000}", quaternion.Z);
-            //ScenarioOutput_W.Text = String.Format("{0,8:0.00000}", quaternion.W);
-
-            //// Rotation Matrix values
-            //SensorRotationMatrix rotationMatrix = reading.RotationMatrix;
-            //ScenarioOutput_M11.Text = String.Format("{0,8:0.00000}", rotationMatrix.M11);
-            //ScenarioOutput_M12.Text = String.Format("{0,8:0.00000}", rotationMatrix.M12);
-            //ScenarioOutput_M13.Text = String.Format("{0,8:0.00000}", rotationMatrix.M13);
-            //ScenarioOutput_M21.Text = String.Format("{0,8:0.00000}", rotationMatrix.M21);
-            //ScenarioOutput_M22.Text = String.Format("{0,8:0.00000}", rotationMatrix.M22);
-            //ScenarioOutput_M23.Text = String.Format("{0,8:0.00000}", rotationMatrix.M23);
-            //ScenarioOutput_M31.Text = String.Format("{0,8:0.00000}", rotationMatrix.M31);
-            //ScenarioOutput_M32.Text = String.Format("{0,8:0.00000}", rotationMatrix.M32);
-            //ScenarioOutput_M33.Text = String.Format("{0,8:0.00000}", rotationMatrix.M33);
 
             return reading;
         }
-
+        
         /// Saves a photo of the preview frame
         private async Task TakePhotoAsync()
         {
@@ -460,9 +514,7 @@ namespace FLogger
         }
 
 
-        ///////////////////////////////////
-        /// Get Preview Frame Handlers
-
+        /// Get Preview Frame a a 3d Surface
         private async Task GetPreviewFrameAsD3DSurfaceAsync()
         {
             // Capture the preview frame as a D3D surface
@@ -501,8 +553,8 @@ namespace FLogger
             //PhotoButton.IsEnabled = _previewProperties != null;
 
             // Update toggle icons based on current mode
-            FaceDetectOnIcon.Visibility = (_faceDetectionEffect == null || !_faceDetectionEffect.Enabled) ? Visibility.Visible : Visibility.Collapsed;
-            FaceDetectOffIcon.Visibility = (_faceDetectionEffect != null && _faceDetectionEffect.Enabled) ? Visibility.Visible : Visibility.Collapsed;
+            PreviewStreamOnIcon.Visibility = (_faceDetectionEffect == null || !_faceDetectionEffect.Enabled) ? Visibility.Visible : Visibility.Collapsed;
+            PreviewStreamOffIcon.Visibility = (_faceDetectionEffect != null && _faceDetectionEffect.Enabled) ? Visibility.Visible : Visibility.Collapsed;
             //StartRecordingIcon.Visibility = _isRecording ? Visibility.Collapsed : Visibility.Visible;
             //StopRecordingIcon.Visibility = _isRecording ? Visibility.Visible : Visibility.Collapsed;
 

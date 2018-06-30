@@ -10,7 +10,7 @@ bld/
 [Oo]bj/
 bin/
 .vs/
-
+.vscode/
 *.py[cod]*.com
 *.class
 *.dll

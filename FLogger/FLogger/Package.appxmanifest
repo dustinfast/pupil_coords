@@ -3,7 +3,7 @@
   <Identity Name="bf0413c1-ea5c-47b5-b0be-4cd3c483d1a7" Publisher="CN=dustinFast" Version="1.0.0.0" />
   <mp:PhoneIdentity PhoneProductId="bf0413c1-ea5c-47b5-b0be-4cd3c483d1a7" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
   <Properties>
-    <DisplayName>flogger</DisplayName>
+    <DisplayName>FLogger</DisplayName>
     <PublisherDisplayName>DustinFast</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
