@@ -99,14 +99,11 @@
     <Compile Include="CalibrationBar.xaml.cs">
       <DependentUpon>CalibrationBar.xaml</DependentUpon>
     </Compile>
-    <Compile Include="InfraPage.xaml.cs">
-      <DependentUpon>InfraPage.xaml</DependentUpon>
-    </Compile>
     <Compile Include="MainPage.xaml.cs">
       <DependentUpon>MainPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="ToastUser.cs" />
+    <Compile Include="ReadEvalPrintLoop.cs" />
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest">
@@ -130,10 +127,6 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Page Include="CalibrationBar.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="InfraPage.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

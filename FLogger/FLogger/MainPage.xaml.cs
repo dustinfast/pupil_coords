@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using Windows.System;
 using Windows.Foundation;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -26,7 +27,6 @@ using Windows.UI;
 using Windows.ApplicationModel.Core;
 using Windows.Media.Capture.Frames;
 
-
 namespace FLogger
 {
     public sealed partial class MainPage : Page
@@ -36,19 +36,22 @@ namespace FLogger
         // TODO: private readonly LightSensor _lightSensor = LightSensor.GetDefault();
         // TODO" private raeadonly ProximitySensor _prixSensor = ProximitySensor.GetDefault();
 
-        // Misc
-        private MediaCapture _mediaCapture;
-        private IMediaEncodingProperties _previewProperties;
-        private FaceDetectionEffect _faceDetectionEffect = null;
-        private MediaFrameSourceKind _camMode = MediaFrameSourceKind.Infrared;
-
         // State Flags
-        private bool _videoOn = false;
+        private bool _videoStreamOn = false;
+        private bool _videoNoStreamOn = false;
         private bool _dataLogOn = false;
         private bool _previewOn = false;
 
-        // Containers
+        // Container for aggregated data
         private List<object> _data = new List<object>();
+
+        // Misc
+        private MediaFrameSourceKind _camMode = MediaFrameSourceKind.Infrared;  // Preferred camera mode
+        private MediaCapture _mediaCapture;
+        private IMediaEncodingProperties _previewProperties;
+        private FaceDetectionEffect _faceDetectionEffect;
+        private ReadEvalPrintLoop _repl;                        // The command line repl interface
+        private Task taskErr = Task.FromResult<object>(null);  // For convenience in returning err from async func
 
         /// Page main()
         public MainPage()
@@ -59,92 +62,133 @@ namespace FLogger
             // Register handlers for camera init and cleanup on suspend/resume
             Application.Current.Suspending += Application_Suspending;
             Application.Current.Resuming += Application_Resuming;
+
+            // Init REPL
+            _repl = new ReadEvalPrintLoop(OutputList);
+            _repl.AddCmd("stream", StreamMode);
+            _repl.AddCmd("nostream", StreamMode);
+            _repl.AddCmd("ir", CamMode); 
+            _repl.AddCmd("exit", Exit);
+
+            // Inital cmd to run
+            _repl.DoCmd("stream on");
         }
 
 
-        /// Button click handlers /////
-
-        // IR camera mode toggle
-        private async void IRModeToggle_Click(object sender, RoutedEventArgs e)
+        /////////////////////////////////////////////////////////////////////
+        /// REPL Commands
+        ////////////////////////////////////////////////////////////////////
+        
+        // The 'stream' command. Args = ( 'on' | 'off')
+        // Starts/Stops sensors in streaming mode, for preview window content
+        // _videoStreamOn is set here
+        private async Task StreamMode(String args)
         {
+            if (args == "on")
+            {
+                if (_videoStreamOn)
+                    OutputList.Items.Add("Already streaming... Chill.");
+                else if (_videoNoStreamOn)
+                    OutputList.Items.Add("ERROR: Cannot start streaming while nostream is active.");
+                else
+                {
+                    await InitCamAsync();
+                    await FaceDetectOnAsync();
+                    await StartPreviewAsync();
+                    _videoStreamOn = true;
+
+                }
+            }
+            else if (args == "off")
+            {
+                if (!_videoStreamOn)
+                    OutputList.Items.Add("Wasn't streaming... Chill.");
+                else if (_videoNoStreamOn)
+                    OutputList.Items.Add("ERROR: nostream is currently active.");
+                else
+                {
+                    await StopPreviewAsync();
+                    await FaceDetectOffAsync();
+                    await ReleaseCamAsync();
+                    _videoStreamOn = false;
+                }
+            }
+            else
+                throw new System.InvalidOperationException("ERROR - Invalid argument: " + args);
+
+        }
+
+        // The 'nostream' command. Args = ( 'start' | 'stop')
+        // Starts/Stops sensors in nostream mode, for on-demand data with no preview
+        // _videoNoStreamOn is set here
+        private Task NoStreamMode(String args)
+        {
+            return null;
+        }
+
+        // The 'ir' command. Args = null
+        // Toggles the camera mode between color and IR mode.
+        private async Task CamMode(string args)
+        {
+            // Toggle mode
             if (_camMode != MediaFrameSourceKind.Infrared)
-            {
                 _camMode = MediaFrameSourceKind.Infrared;
-                await InitCamAsync(_camMode);
-            }
             else
-            {
                 _camMode = MediaFrameSourceKind.Color;
-                await InitCamAsync(_camMode);
 
-            }
-
-            UpdateUIControls();
-        }
-
-        // Preview stream toggle
-        private async void PreviewStreamToggle_Click(object sender, RoutedEventArgs e)
-        {
-            if (!_videoOn)
-                return;
-
-            // if (_faceDetectionEffect == null || !_faceDetectionEffect.Enabled)
-            if (!_previewOn)
+            // Restart 
+            if (_videoStreamOn)
             {
-                await StartPreviewAsync();
-                _previewOn = true;
+                await StreamMode("off");
+                await StreamMode("on");
             }
-            else
+            else if (_videoNoStreamOn)
             {
-                await StopPreviewAsync();
-                _previewOn = false;
+                await NoStreamMode("off");
+                await NoStreamMode("on");
             }
-
-            UpdateUIControls();
         }
 
-        // Frame Capture btn click
-        private async void PhotoButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (!_videoOn)
-                return;
-
-            await TakePhotoAsync();
-        }
-
-        // Data logging toggle
-        private void DataLogToggle_Click(object sender, RoutedEventArgs e)
-        {
-            Debug.WriteLine("LoggerBtnClicked");
-            if (!_dataLogOn)
-                _dataLogOn = true;
-            else
-                _dataLogOn = false;
-
-            UpdateUIControls();
-        }
-
-        // Exit Button
-        private async void ExitBtn_Click(object sender, RoutedEventArgs e)
+        // The 'exit' command. Args = null
+        // Does cleanp and exits the application.
+        private async Task Exit(String args)
         {
             //Do cleanup and exit
-            await ReleaseCamAsync();
-            await StopPreviewAsync();
+            if (_videoStreamOn)
+                await ReleaseCamAsync();
+            if (_previewOn)
+                await StopPreviewAsync();
 
             CoreApplication.Exit();
         }
 
-
-        /// State and Mode toggle handlers /////
-         
-        // Setup the camera and init MediaCapture in the desired mode
-        private async Task InitCamAsync(MediaFrameSourceKind mode)
+        // REPL command input textbox. Sends cmd for processing on Enter clicked.
+        private void CmdInputTxt_KeyUp(object sender, Windows.UI.Xaml.Input.KeyRoutedEventArgs e)
         {
-            if (mode != MediaFrameSourceKind.Color && mode != MediaFrameSourceKind.Infrared)
+            if (e.Key == VirtualKey.Enter)
+            {
+                TextBox txtBox = (TextBox)sender;
+                String input = txtBox.Text;
+                txtBox.Text = "";
+                _repl.DoCmd(input);
+            }
+        }
+
+
+        /////////////////////////////////////////////////////////////////////
+        /// Stream mode handlers
+        ////////////////////////////////////////////////////////////////////
+
+        // Setup the camera and init MediaCapture in the desired mode.
+        // _videoStreamOn = true on success.
+        private async Task InitCamAsync()
+        {
+            if (_camMode != MediaFrameSourceKind.Color && _camMode != MediaFrameSourceKind.Infrared)
                 throw new System.InvalidOperationException("ERROR: An unsupported camera mode was requested.");
 
-            if (_videoOn)
+            if (_videoStreamOn)
                 await ReleaseCamAsync();
+            _videoStreamOn = false;
 
             var frameGroups = await MediaFrameSourceGroup.FindAllAsync();
 
@@ -154,7 +198,7 @@ namespace FLogger
                 Group = g,
                 SourceInfos = new MediaFrameSourceInfo[]
                 {
-                    g.SourceInfos.FirstOrDefault(info => info.SourceKind == mode)
+                    g.SourceInfos.FirstOrDefault(info => info.SourceKind == _camMode)
                 }
             }).Where(g => g.SourceInfos.Any(info => info != null)).ToList();
 
@@ -175,7 +219,7 @@ namespace FLogger
             {
                 _mediaCapture = new MediaCapture();
                 await _mediaCapture.InitializeAsync(settings);
-                _videoOn = true;
+                _videoStreamOn = true;
             }
             catch (Exception ex)
             {
@@ -184,52 +228,54 @@ namespace FLogger
             }
         }
 
-        /// Release camera and MediaCapture
+        // Release camera and MediaCapture
+        // _videoStreamOn = false on success.
         private async Task ReleaseCamAsync()
         {
             Debug.WriteLine("ReleaseCamAsync");
-            if (_videoOn)
+            if (_videoStreamOn)
             {
                 if (_faceDetectionEffect != null)
                     await FaceDetectOffAsync();
 
                 if (_previewProperties != null)
                     await StopPreviewAsync();
-
-                _videoOn = false;
             }
 
             if (_mediaCapture != null)
-            {
                 _mediaCapture.Dispose();
-                _mediaCapture = null;
-            }
+
+            _videoStreamOn = false;
+            _mediaCapture = null;
+
         }
 
-        /// Start preview stream from MediaCapture
+        // Start preview stream from _mediaCapture
+        // _previewOn = true on success.
         private async Task StartPreviewAsync()
         {
             PreviewControl.Source = _mediaCapture;
             await _mediaCapture.StartPreviewAsync();
             _previewProperties = _mediaCapture.VideoDeviceController.GetMediaStreamProperties(MediaStreamType.VideoPreview);
-            Debug.WriteLine("Preview Started.");
+            _previewOn = true;
         }
 
-        /// Stop preview stream
+        // Stop preview stream from _mediaCapture
+        // _previewOn = false on success.
         private async Task StopPreviewAsync()
         {
             _previewProperties = null;
             await _mediaCapture.StopPreviewAsync();
 
             await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-            {
-                PreviewControl.Source = null; // UI Cleanup
-            });
-            Debug.WriteLine("Preview Stopped.");
+            { PreviewControl.Source = null; });
+            _previewOn = false;
         }
 
 
-        /// Face detection /////
+        /////////////////////////////////////////////////////////////////////
+        /// Face Detection
+        ////////////////////////////////////////////////////////////////////
 
         /// Called on _faceDetectionEffect.FaceDetected and instructs the UI to add FaceRects to preview overlay
         private async void OnFaceDetectedAsync(FaceDetectionEffect sender, FaceDetectedEventArgs args)
@@ -269,7 +315,6 @@ namespace FLogger
         }
 
         /// Enables face detection - registers for its events, and gets the FaceDetectionEffect instance
-        /// Enables face detection - registers for its events,and gets the FaceDetectionEffect instance
         private async Task FaceDetectOnAsync()
         {
             // Init effect
@@ -374,7 +419,9 @@ namespace FLogger
         }
 
 
-        /// Utility Functions /////
+        /////////////////////////////////////////////////////////////////////
+        /// Utility Functions
+        ////////////////////////////////////////////////////////////////////
 
         /// Gets device orientation (roll, pitch, yaw)
         private InclinometerReading GetOrientation()
@@ -384,7 +431,6 @@ namespace FLogger
                            "Roll: " + String.Format("{0,5:0.00}", reading.RollDegrees) + ", " +
                            "Yaw: " + String.Format("{0,5:0.00}", reading.YawDegrees) + ". " +
                            "Conf: " + reading.YawAccuracy.ToString();
-            Debug.WriteLine(ostr);
 
             // // Calibrate Magnetometer if no confidence
             // var acc = _inclineSensor.GetCurrentReading().YawAccuracy;
@@ -400,7 +446,7 @@ namespace FLogger
 
             return reading;
         }
-        
+
         /// Saves a photo of the preview frame
         private async Task TakePhotoAsync()
         {
@@ -425,153 +471,74 @@ namespace FLogger
                 }
             }
             Debug.WriteLine("Photo saved to " + file.Path);
-
-
-            //BMP
-            //https://github.com/Microsoft/Windows-universal-samples/blob/master/Samples/CameraGetPreviewFrame/cs/MainPage.xaml.cs
-            //private static readonly SemaphoreSlim _mediaCaptureLifeLock = new SemaphoreSlim(1);
-            //await _mediaCaptureLifeLock.WaitAsync(); ?
-            //var previewProperties = _mediaCapture.VideoDeviceController.GetMediaStreamProperties(MediaStreamType.VideoPreview) as VideoEncodingProperties;
-            //var videoFrame = new VideoFrame(BitmapPixelFormat.Bgra8, (int)previewProperties.Width, (int)previewProperties.Height);
-
-            //using (var currentFrame = await _mediaCapture.GetPreviewFrameAsync(videoFrame))
-            //{
-            //    // Collect the resulting frame and show text on page
-            //    SoftwareBitmap previewFrame = currentFrame.SoftwareBitmap;
-            //    FrameInfoTextBlock.Text = String.Format("{0}x{1} {2}", previewFrame.PixelWidth, previewFrame.PixelHeight, previewFrame.BitmapPixelFormat);
-            //    // Create a SoftwareBitmapSource to display the SoftwareBitmap to the user
-            //    var sbSource = new SoftwareBitmapSource();
-            //    await sbSource.SetBitmapAsync(previewFrame);
-            //    PreviewFrameImage.Source = sbSource;
-
-            //    using (var outputStream = await file.OpenAsync(FileAccessMode.ReadWrite))
-            //    {
-            //        var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.JpegEncoderId, outputStream);
-
-            //        // Grab the data from the SoftwareBitmap
-            //        encoder.SetSoftwareBitmap(previewFrame);
-            //        await encoder.FlushAsync();
-            //    }
-            //}
-            //await _mediaCaptureLifeLock.Release(); ?
         }
 
-        /// Get Preview Frame as a 3d Surface
-        private async Task GetPreviewFrameAsD3DSurfaceAsync()
-        {
-            // Capture the preview frame as a D3D surface
-            using (var currentFrame = await _mediaCapture.GetPreviewFrameAsync())
-            {
-                // Check that the Direct3DSurface isn't null. It's possible that the device does not support getting the frame
-                // as a D3D surface
-                if (currentFrame.Direct3DSurface != null)
-                {
-                    // Collect the resulting frame
-                    var surface = currentFrame.Direct3DSurface;
 
-                    // Show the frame information
-                    InfoTextBlock.Text = String.Format("{0}x{1} {2}", surface.Description.Width, surface.Description.Height, surface.Description.Format);
-                    Debug.WriteLine("Got 3D Frame");
-                }
-                else // Fall back to software bitmap
-                {
-                    Debug.WriteLine("Could not get 3D Frame");
-
-                    SoftwareBitmap previewFrame = currentFrame.SoftwareBitmap;
-                    InfoTextBlock.Text = String.Format("{0}x{1} {2}", previewFrame.PixelWidth, previewFrame.PixelHeight, previewFrame.BitmapPixelFormat);
-                }
-               
-                // Clear the image
-                PreviewControl.Source = null;
-            }
-        }
-
-        private void UpdateUIControls()
-        {
-            // Clear everything from the preview overlay
-            PreviewOverlay.Children.Clear();
-
-            // Enabled/disabled buttons based on capabilities 
-            //PhotoButton.IsEnabled = _previewProperties != null;
-
-            // Update toggle icons based on current mode
-            //PreviewStreamOnIcon.Visibility = (_faceDetectionEffect == null || !_faceDetectionEffect.Enabled) ? Visibility.Visible : Visibility.Collapsed;
-            //PreviewStreamOffIcon.Visibility = (_faceDetectionEffect != null && _faceDetectionEffect.Enabled) ? Visibility.Visible : Visibility.Collapsed;
-            ////StartRecordingIcon.Visibility = _isRecording ? Visibility.Collapsed : Visibility.Visible;
-            //StopRecordingIcon.Visibility = _isRecording ? Visibility.Visible : Visibility.Collapsed;
-
-            // Hide the face detection canvas and clear it
-            //FacesCanvas.Visibility = (_faceDetectionEffect != null && _faceDetectionEffect.Enabled) ? Visibility.Visible : Visibility.Collapsed;
-
-            //PhotoButton.Opacity = PhotoButton.IsEnabled ? 1 : 0;
-        }
-
-        ///////////////////////////////
-        /// Resume/Suspend Helpers
+        /////////////////////////////////////////////////////////////
+        /// Resume/Suspend and Navigate To/From Handlers
+        /// On Suspend, stop active modes. On Resume, restart them.
+        /////////////////////////////////////////////////////////////
         private async void Application_Suspending(object sender, SuspendingEventArgs e)
         {
-            // Handle global application events only if this page is active
-            if (Frame.CurrentSourcePageType == typeof(MainPage))
-            {
-                Debug.WriteLine("Suspending...");
-                var deferral = e.SuspendingOperation.GetDeferral();
-                await ReleaseCamAsync();
-                deferral.Complete();
-            }
+            Debug.WriteLine("Suspending...");
+            var deferral = e.SuspendingOperation.GetDeferral();
+            if (_videoStreamOn)
+                await StreamMode("off");
+            else if (_videoNoStreamOn)
+                await NoStreamMode("off");
+            deferral.Complete();
         }
-
         private async void Application_Resuming(object sender, object o)
         {
-            // Handle global application events only if this page is active
-            if (Frame.CurrentSourcePageType == typeof(MainPage))
-            {
-                await InitCamAsync(_camMode);
-                Debug.WriteLine("Resumed from suspend");
-            }
+            Debug.WriteLine("Resumed from suspend");
+            if (_videoStreamOn)
+                await StreamMode("on");
+            else if (_videoNoStreamOn)
+                await NoStreamMode("on");
         }
-
-        /////////////////////////////////
-        /// Navigation Helpers
         protected override async void OnNavigatedTo(NavigationEventArgs e)
         {
             Debug.WriteLine("Navigated To");
-            await InitCamAsync(_camMode);
+            //if (_videoStreamOn)
+            //    await StreamMode("on");
+            //else if (_videoNoStreamOn)
+            //    await NoStreamMode("on");
         }
-
         protected override async void OnNavigatingFrom(NavigatingCancelEventArgs e)
         {
             Debug.WriteLine("Navigated From");
-            await ReleaseCamAsync();
+            //if (_videoStreamOn)
+            //    await StreamMode("off");
+            //else if (_videoNoStreamOn)
+            //    await NoStreamMode("off");
         }
-
-        
     }
 }
 
+//PreviewFrame
+//https://github.com/Microsoft/Windows-universal-samples/blob/master/Samples/CameraGetPreviewFrame/cs/MainPage.xaml.cs
+//private static readonly SemaphoreSlim _mediaCaptureLifeLock = new SemaphoreSlim(1);
+//await _mediaCaptureLifeLock.WaitAsync(); ?
+//var previewProperties = _mediaCapture.VideoDeviceController.GetMediaStreamProperties(MediaStreamType.VideoPreview) as VideoEncodingProperties;
+//var videoFrame = new VideoFrame(BitmapPixelFormat.Bgra8, (int)previewProperties.Width, (int)previewProperties.Height);
 
-///// In the event of the app being minimized, handles media property change events. If the app receives a mute
-///// notification, it is no longer in the foregroud.
-// Use:
-//private SystemMediaTransportControls _systemMediaControls = null;
-//_systemMediaControls = SystemMediaTransportControls.GetForCurrentView();
-//
-//private async void SystemMediaControls_PropertyChanged(SystemMediaTransportControls sender, SystemMediaTransportControlsPropertyChangedEventArgs args)
+//using (var currentFrame = await _mediaCapture.GetPreviewFrameAsync(videoFrame))
 //{
-//    await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+//    // Collect the resulting frame and show text on page
+//    SoftwareBitmap previewFrame = currentFrame.SoftwareBitmap;
+//    FrameOutputText.Text = String.Format("{0}x{1} {2}", previewFrame.PixelWidth, previewFrame.PixelHeight, previewFrame.BitmapPixelFormat);
+//    // Create a SoftwareBitmapSource to display the SoftwareBitmap to the user
+//    var sbSource = new SoftwareBitmapSource();
+//    await sbSource.SetBitmapAsync(previewFrame);
+//    PreviewFrameImage.Source = sbSource;
+
+//    using (var outputStream = await file.OpenAsync(FileAccessMode.ReadWrite))
 //    {
-//         // Only handle this event if this page is currently being displayed
-//         if (args.Property == SystemMediaTransportControlsProperty.SoundLevel && Frame.CurrentSourcePageType == typeof(MainPage))
-//        {
-//             // Check to see if the app is being muted. If so, it is being minimized.
-//             // Otherwise if it is not initialized, it is being brought into focus.
-//             if (sender.SoundLevel == SoundLevel.Muted)
-//            {
-//                await ReleaseCamAsync();
-//            }
-//            else if (!_videoOn)
-//            {
-//                await InitSensorsAsync();
-//            }
-//        }
-//    });
+//        var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.JpegEncoderId, outputStream);
+
+//        // Grab the data from the SoftwareBitmap
+//        encoder.SetSoftwareBitmap(previewFrame);
+//        await encoder.FlushAsync();
+//    }
 //}
+//await _mediaCaptureLifeLock.Release(); ?
