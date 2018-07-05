@@ -12,7 +12,7 @@ using Windows.Media.Capture;
 using Windows.Media.Capture.Frames;
 using Windows.UI.Xaml.Controls;
 
-namespace Flogger
+namespace FLogger
 {
     public sealed partial class FrameCapture
     {

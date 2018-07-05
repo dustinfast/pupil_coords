@@ -69,7 +69,7 @@
         <!-- ########## RIGHT COLUMN ########## -->
 
         <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Bottom">
-            <ListView Grid.Column="1" Name="OutputList" HorizontalAlignment="Left" BorderThickness="1" Background="#FF1E1E1E" Height="600" Width="500"  Margin="0,0,0,0" VerticalAlignment="Bottom"/>
+            <TextBlock Grid.Column="1" x:Name="OutputBox" Height="600" Width="500"  Margin="0,0,0,0" VerticalAlignment="Bottom"/>
             <TextBox Grid.Column="1" Name="InputText" BorderThickness="1" Background="#FF1E1E1E" KeyUp="CmdInputTxt_KeyUp"/>
         </StackPanel>
         

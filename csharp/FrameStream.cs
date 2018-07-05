@@ -1,9 +1,4 @@
-/// FrameStream.cs
-//  Renders MediaCapture frames to the given CaptureElement 
-//
-//
-// Author: Dustin Fast, 2018
-using System;
+﻿using System;
 using Windows.Foundation;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
@@ -18,9 +13,8 @@ using Windows.UI.Core;
 using Windows.UI.Xaml.Shapes;
 using Windows.Media.FaceAnalysis;
 using Windows.UI;
-using Windows.Media.Capture.Frames;
 
-namespace Flogger
+namespace FLogger
 {
     class FrameStream
     {
@@ -28,26 +22,32 @@ namespace Flogger
         private MediaCaptureInitializationSettings _mediaCaptureSettings;
         private IMediaEncodingProperties _previewProperties;
         private FaceDetectionEffect _faceDetectionEffect;
-        private MediaFrameSourceKind _camMode;
+
+        private CoreDispatcher _dispatcher;
 
         private CaptureElement _captureElement;
         private Canvas _previewOverlay;
         private bool _streamOn = false;
-        private bool _previewOn = false;
 
         public FrameStream(MediaCaptureInitializationSettings captureSettings, CaptureElement captureElement, Canvas previewOverlay)
         {
             _mediaCaptureSettings = captureSettings;
             _captureElement = captureElement;
             _previewOverlay = previewOverlay;
+            _dispatcher = _captureElement.Dispatcher;
         }
 
         // Start preview stream from _mediaCapture
         // _steamOn = true on success.
-        private async Task StartStreamAsync()
+        public async Task StartStreamAsync()
         {
             if (_streamOn)
+            {
                 await StopStreamAsync();
+            }
+
+            await InitCamAsync();
+            await FaceDetectOnAsync();
 
             _captureElement.Source = _mediaCapture;
             await _mediaCapture.StartPreviewAsync();
@@ -57,31 +57,29 @@ namespace Flogger
 
         // Stop preview stream from _mediaCapture
         // _steamOn = false on success.
-        private async Task StopStreamAsync()
+        public async Task StopStreamAsync()
         {
             if (_streamOn)
             {
+                await FaceDetectOffAsync();
+
                 _previewProperties = null;
                 await _mediaCapture.StopPreviewAsync();
 
-                await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                await _dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                 { _captureElement.Source = null; });
+
+                _mediaCapture.Dispose();
+                _mediaCapture = null;
+
                 _streamOn = false;
             }
         }
-
 
         // Init MediaCapture in the desired mode.
         // _streamOn = true on success.
         private async Task InitCamAsync()
         {
-            if (_camMode != MediaFrameSourceKind.Color && _camMode != MediaFrameSourceKind.Infrared)
-                throw new System.InvalidOperationException("ERROR: An unsupported camera mode was requested.");
-
-            if (_streamOn)
-                await ReleaseCamAsync();
-            _streamOn = false;
-
             try
             {
                 _mediaCapture = new MediaCapture();
@@ -93,50 +91,6 @@ namespace Flogger
                 Debug.WriteLine("MediaCapture initialization failed: " + ex.Message);
                 _streamOn = false;
             }
-        }
-
-        // Release camera and MediaCapture
-        // _streamOn = false on success.
-        private async Task ReleaseCamAsync()
-        {
-            Debug.WriteLine("ReleaseCamAsync");
-            if (_streamOn)
-            {
-                if (_faceDetectionEffect != null)
-                    await FaceDetectOffAsync();
-
-                if (_previewProperties != null)
-                    await StopPreviewAsync();
-            }
-
-            if (_mediaCapture != null)
-                _mediaCapture.Dispose();
-
-            _streamOn = false;
-            _mediaCapture = null;
-
-        }
-
-        // Start preview stream from _mediaCapture
-        // _previewOn = true on success.
-        private async Task StartPreviewAsync()
-        {
-            _captureElement.Source = _mediaCapture;
-            await _mediaCapture.StartPreviewAsync();
-            _previewProperties = _mediaCapture.VideoDeviceController.GetMediaStreamProperties(MediaStreamType.VideoPreview);
-            _previewOn = true;
-        }
-
-        // Stop preview stream from _mediaCapture
-        // _previewOn = false on success.
-        private async Task StopPreviewAsync()
-        {
-            _previewProperties = null;
-            await _mediaCapture.StopPreviewAsync();
-
-            await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-            { _captureElement.Source = null; });
-            _previewOn = false;
         }
 
 
@@ -153,7 +107,7 @@ namespace Flogger
         /// Called on _faceDetectionEffect.FaceDetected and instructs the UI to add FaceRects to preview overlay
         private async void OnFaceDetectedAsync(FaceDetectionEffect sender, FaceDetectedEventArgs args)
         {
-            await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => AddFaceRects(args.ResultFrame.DetectedFaces));
+            await _dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => AddFaceRects(args.ResultFrame.DetectedFaces));
         }
 
         /// Adds Rectangles around the given faces to the _previewOverlay as a face bounding boxes
@@ -289,6 +243,5 @@ namespace Flogger
             return result;
         }
 
-        
     }
 }
