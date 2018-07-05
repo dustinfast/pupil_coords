@@ -102,6 +102,7 @@
     </Compile>
     <Compile Include="FrameRender.cs" />
     <Compile Include="FrameCapture.cs" />
+    <Compile Include="FrameStream.cs" />
     <Compile Include="MainPage.xaml.cs">
       <DependentUpon>MainPage.xaml</DependentUpon>
     </Compile>

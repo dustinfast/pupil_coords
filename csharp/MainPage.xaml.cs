@@ -1,5 +1,8 @@
 ﻿/// MainPage.xaml.cs
-//  The main module for FLogger. Handles REPL and preview output.
+//  The main module for FLogger. 
+//  Handles:
+//       REPL input/ouput
+//       Camera/MediaCapture setup
 //
 //
 // Author: Dustin Fast, 2018
@@ -21,9 +24,6 @@ using Windows.Graphics.Imaging;
 using Windows.Media.Core;
 using Windows.Media.Capture;
 using Windows.Media.MediaProperties;
-using Windows.Storage;
-using Windows.Storage.FileProperties;
-using Windows.Storage.Streams;
 using Windows.UI.Core;
 using Windows.UI.Xaml.Shapes;
 using Windows.Media.FaceAnalysis;
@@ -49,12 +49,11 @@ namespace FLogger
         private List<object> _data = new List<object>();
 
         // Misc
-        private MediaFrameSourceKind _camMode = MediaFrameSourceKind.Infrared;  // starting cam mode
+        private MediaFrameSourceKind _camMode = MediaFrameSourceKind.Infrared;  // initial cam mode
         private MediaCapture _mediaCapture;
         private IMediaEncodingProperties _previewProperties;
         private FaceDetectionEffect _faceDetectionEffect;
-        private ReadEvalPrintLoop _repl;                        // The command line repl interface
-        private Task taskErr = Task.FromResult<object>(null);  // For convenience in returning err from async func
+        private ReadEvalPrintLoop _repl;
 
         /// Page main()
         public MainPage()
@@ -92,7 +91,7 @@ namespace FLogger
                 if (_videoNoStreamOn)
                     OutputList.Items.Add("ERROR: Cannot start streaming while nostream is active.");
                 else if (_videoStreamOn)
-                    OutputList.Items.Add("Already streaming... Chill.");
+                    OutputList.Items.Add("Already streaming... Chill."); 
                 else
                 {
                     await InitCamAsync();
@@ -383,59 +382,6 @@ namespace FLogger
             _faceDetectionEffect = null;
         }
 
-        //// Takes a media frame as a bitmp and the face rect as BitmapBounds and Returns
-        //// a rectangle. If both pupils found, rectangle is pupil x, y, h. Else, rect is 0x0x0
-        //private void getPupilCoords(Bitmap bmp, BitmapBounds faceBox)
-        //{
-        //    System.Drawing.Bitmap aq = (Bitmap)pictureBox1.Image; //take the image
-
-        //    // Invert the image, if color?
-        //    Invert a = new Invert();
-        //    aq = a.Apply(aq);
-        //    AForge.Imaging.Image.FormatImage(ref aq);
-
-        //    // apply grayscale, if color?
-        //    IFilter filter = Grayscale.CommonAlgorithms.BT709;
-        //    aq = filter.Apply(aq);
-
-        //    // Change to binary
-        //    Threshold th = new Threshold(220);
-        //    aq = th.Apply(aq);
-
-        //    // Divide the facebox into four quadrants:
-        //    // -----------
-        //    // | q1 | q2 |       
-        //    // -----------
-        //    // | q3 | q4 |       
-        //    // -----------
-
-
-        //    // For q1 and q2, because that's where the eyes are located:
-
-        //    // find the biggest object using BlobCounter
-        //    BlobCounter bl = new BlobCounter(aq);
-
-        //    /// If at least one blob, find the pupil start position and height
-        //    int x, y, h = 0;
-        //    if (bl.ObjectsCount > 0)
-        //    {
-        //        ExtractBiggestBlob fil2 = new ExtractBiggestBlob();
-        //        fil2.Apply(aq);
-        //        x = fil2.BlobPosition.X;
-        //        y = fil2.BlobPosition.Y;
-        //        h = fil2.Apply(aq).Height;
-        //    }
-            
-        //    return new Rectangle(new Point(x - h, y - h), new Size(3 * h, 3 * h));
-        //}
-
-        //public Bitmap CropImage(Bitmap source, Rectangle section)
-        //{
-        //    Bitmap bmp = new Bitmap(section.Width, section.Height);
-        //    Graphics g = Graphics.FromImage(bmp);
-        //    g.DrawImage(source, 0, 0, section, GraphicsUnit.Pixel);
-        //    return bmp;
-        //}
 
         /// Takes face rectangle in preview coords and returns one in UI coords.
         /// faceBoxInPreviewCoordinates = FaceBox.DetectedFace, in preview coordinates.
@@ -536,35 +482,9 @@ namespace FLogger
             return reading;
         }
 
-        /// Saves a photo of the preview frame
-        private async Task TakePhotoAsync()
-        {
-            // Img save location
-            var picturesLibrary = await StorageLibrary.GetLibraryAsync(KnownLibraryId.Pictures);
-            StorageFolder _captureFolder = ApplicationData.Current.LocalFolder;
-            var file = await _captureFolder.CreateFileAsync("PreviewFrame.jpg", CreationCollisionOption.GenerateUniqueName);
-
-            // TODO: Get frame with overlay instead of without
-            var stream = new InMemoryRandomAccessStream();
-            await _mediaCapture.CapturePhotoToStreamAsync(ImageEncodingProperties.CreateJpeg(), stream);
-
-            using (var inputStream = stream)
-            {
-                var decoder = await BitmapDecoder.CreateAsync(inputStream);
-                using (var outputStream = await file.OpenAsync(FileAccessMode.ReadWrite))
-                {
-                    var encoder = await BitmapEncoder.CreateForTranscodingAsync(outputStream, decoder);
-                    var properties = new BitmapPropertySet { { "System.Photo.Orientation", new BitmapTypedValue(PhotoOrientation.Normal, PropertyType.UInt16) } };
-                    await encoder.BitmapProperties.SetPropertiesAsync(properties);
-                    await encoder.FlushAsync();
-                }
-            }
-            Debug.WriteLine("Photo saved to " + file.Path);
-        }
-
 
         /////////////////////////////////////////////////////////////
-        /// Resume/Suspend and Navigate To/From Handlers
+        /// Resume/Suspend/NavigateTo/NavigateFrom Handlers
         /// On Suspend, stop active modes. On Resume, restart them.
         /////////////////////////////////////////////////////////////
         private async void Application_Suspending(object sender, SuspendingEventArgs e)
@@ -631,3 +551,87 @@ namespace FLogger
 //    }
 //}
 //await _mediaCaptureLifeLock.Release(); ?
+
+
+// /// Saves a photo of the preview frame
+// private async Task TakePhotoAsync()
+// {
+//     // Img save location
+//     var picturesLibrary = await StorageLibrary.GetLibraryAsync(KnownLibraryId.Pictures);
+//     StorageFolder _captureFolder = ApplicationData.Current.LocalFolder;
+//     var file = await _captureFolder.CreateFileAsync("PreviewFrame.jpg", CreationCollisionOption.GenerateUniqueName);
+
+//     // TODO: Get frame with overlay instead of without
+//     var stream = new InMemoryRandomAccessStream();
+//     await _mediaCapture.CapturePhotoToStreamAsync(ImageEncodingProperties.CreateJpeg(), stream);
+
+//     using (var inputStream = stream)
+//     {
+//         var decoder = await BitmapDecoder.CreateAsync(inputStream);
+//         using (var outputStream = await file.OpenAsync(FileAccessMode.ReadWrite))
+//         {
+//             var encoder = await BitmapEncoder.CreateForTranscodingAsync(outputStream, decoder);
+//             var properties = new BitmapPropertySet { { "System.Photo.Orientation", new BitmapTypedValue(PhotoOrientation.Normal, PropertyType.UInt16) } };
+//             await encoder.BitmapProperties.SetPropertiesAsync(properties);
+//             await encoder.FlushAsync();
+//         }
+//     }
+//     Debug.WriteLine("Photo saved to " + file.Path);
+// }
+
+
+
+
+//// Takes a media frame as a bitmp and the face rect as BitmapBounds and Returns
+//// a rectangle. If both pupils found, rectangle is pupil x, y, h. Else, rect is 0x0x0
+//private void getPupilCoords(Bitmap bmp, BitmapBounds faceBox)
+//{
+//    System.Drawing.Bitmap aq = (Bitmap)pictureBox1.Image; //take the image
+
+//    // Invert the image, if color?
+//    Invert a = new Invert();
+//    aq = a.Apply(aq);
+//    AForge.Imaging.Image.FormatImage(ref aq);
+
+//    // apply grayscale, if color?
+//    IFilter filter = Grayscale.CommonAlgorithms.BT709;
+//    aq = filter.Apply(aq);
+
+//    // Change to binary
+//    Threshold th = new Threshold(220);
+//    aq = th.Apply(aq);
+
+//    // Divide the facebox into four quadrants:
+//    // -----------
+//    // | q1 | q2 |       
+//    // -----------
+//    // | q3 | q4 |       
+//    // -----------
+
+
+//    // For q1 and q2, because that's where the eyes are located:
+
+//    // find the biggest object using BlobCounter
+//    BlobCounter bl = new BlobCounter(aq);
+
+//    /// If at least one blob, find the pupil start position and height
+//    int x, y, h = 0;
+//    if (bl.ObjectsCount > 0)
+//    {
+//        ExtractBiggestBlob fil2 = new ExtractBiggestBlob();
+//        fil2.Apply(aq);
+//        x = fil2.BlobPosition.X;
+//        y = fil2.BlobPosition.Y;
+//        h = fil2.Apply(aq).Height;
+//    }
+
+//    return new Rectangle(new Point(x - h, y - h), new Size(3 * h, 3 * h));
+//}
+
+//public Bitmap CropImage(Bitmap source, Rectangle section)
+//{
+//    Bitmap bmp = new Bitmap(section.Width, section.Height);
+//    Graphics g = Graphics.FromImage(bmp);
+//    g.DrawImage(source, 0, 0, section, GraphicsUnit.Pixel);
+//    return bmp;
+//}

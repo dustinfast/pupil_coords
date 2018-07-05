@@ -1,5 +1,5 @@
 ﻿/// FrameRender.cs
-//  Processes a frame and renders it to an Image control
+//  Processes a given frame and renders it to the Image control
 //
 //  Usage:
 //      var renderer = FrameRenderer(ImageControl);
