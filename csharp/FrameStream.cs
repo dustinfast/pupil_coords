@@ -18,17 +18,23 @@ namespace FLogger
 {
     class FrameStream
     {
+        // MediaCapture
         private MediaCapture _mediaCapture;
         private MediaCaptureInitializationSettings _mediaCaptureSettings;
+
+        // Preview and FaceDetect instances
         private IMediaEncodingProperties _previewProperties;
         private FaceDetectionEffect _faceDetectionEffect;
 
+        //UI elements and dispatcher
         private CoreDispatcher _dispatcher;
-
         private CaptureElement _captureElement;
         private Canvas _previewOverlay;
+
+        // State
         private bool _streamOn = false;
 
+        // Constructor
         public FrameStream(MediaCaptureInitializationSettings captureSettings, CaptureElement captureElement, Canvas previewOverlay)
         {
             _mediaCaptureSettings = captureSettings;
@@ -42,9 +48,7 @@ namespace FLogger
         public async Task StartStreamAsync()
         {
             if (_streamOn)
-            {
                 await StopStreamAsync();
-            }
 
             await InitCamAsync();
             await FaceDetectOnAsync();
@@ -55,7 +59,7 @@ namespace FLogger
             _streamOn = true;
         }
 
-        // Stop preview stream from _mediaCapture
+        // Stop preview stream and release resources
         // _steamOn = false on success.
         public async Task StopStreamAsync()
         {
@@ -76,7 +80,7 @@ namespace FLogger
             }
         }
 
-        // Init MediaCapture in the desired mode.
+        // Init MediaCapture in with the given settings
         // _streamOn = true on success.
         private async Task InitCamAsync()
         {
@@ -102,6 +106,7 @@ namespace FLogger
 
         /////////////////////////////////////////////////////////////////////
         /// Face Detection
+        /// From https://github.com/Microsoft/Windows-universal-samples
         ////////////////////////////////////////////////////////////////////
 
         /// Called on _faceDetectionEffect.FaceDetected and instructs the UI to add FaceRects to preview overlay

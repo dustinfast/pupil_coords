@@ -1,8 +1,9 @@
 ﻿/// MainPage.xaml.cs
 //  The main module for FLogger. 
 //  Handles:
-//       REPL input/ouput
-//       Camera/MediaCapture setup
+//      UI
+//      REPL input/ouput
+//      Camera/MediaCapture setup
 //
 //
 // Author: Dustin Fast, 2018
@@ -10,24 +11,15 @@
 using System;
 using System.Linq;
 using Windows.System;
-using Windows.Foundation;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
-using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Windows.ApplicationModel;
 using Windows.Devices.Sensors;
-using Windows.Graphics.Imaging;
-using Windows.Media.Core;
 using Windows.Media.Capture;
-using Windows.Media.MediaProperties;
-using Windows.UI.Core;
-using Windows.UI.Xaml.Shapes;
-using Windows.Media.FaceAnalysis;
-using Windows.UI;
 using Windows.ApplicationModel.Core;
 using Windows.Media.Capture.Frames;
 
@@ -35,10 +27,6 @@ namespace FLogger
 {
     public sealed partial class MainPage : Page
     {
-        // Sensors
-        private readonly Inclinometer _inclineSensor = Inclinometer.GetDefault();
-        // TODO: private raeadonly ProximitySensor _prixSensor = ProximitySensor.GetDefault();
-
         // State Flags
         private bool _videoStreamOn = false;
         private bool _videoNoStreamOn = false;
@@ -252,12 +240,15 @@ namespace FLogger
         /// Gets device orientation (roll, pitch, yaw)
         private InclinometerReading GetOrientation()
         {
-            InclinometerReading reading = _inclineSensor.GetCurrentReading();
-            String ostr = "Pitch: " + String.Format("{0,5:0.00}", reading.PitchDegrees) + ", " +
-                           "Roll: " + String.Format("{0,5:0.00}", reading.RollDegrees) + ", " +
-                           "Yaw: " + String.Format("{0,5:0.00}", reading.YawDegrees) + ". " +
-                           "Conf: " + reading.YawAccuracy.ToString();
+            Inclinometer _inclineSensor = Inclinometer.GetDefault();
 
+            InclinometerReading reading = _inclineSensor.GetCurrentReading();
+
+            //String ostr = "Pitch: " + String.Format("{0,5:0.00}", reading.PitchDegrees) + ", " +
+            //               "Roll: " + String.Format("{0,5:0.00}", reading.RollDegrees) + ", " +
+            //               "Yaw: " + String.Format("{0,5:0.00}", reading.YawDegrees) + ". " +
+            //               "Conf: " + reading.YawAccuracy.ToString();
+            
             // // Calibrate Magnetometer if no confidence
             // var acc = _inclineSensor.GetCurrentReading().YawAccuracy;
             // Debug.WriteLine("Mag Accuracy: " + acc.ToString());

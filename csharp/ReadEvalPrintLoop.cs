@@ -17,17 +17,20 @@ namespace FLogger
     class ReadEvalPrintLoop
     {
 
-        // Availalbe REPL commands - Format is { CommandString: Function }
-        // Should be set by user with AddCmd()
+        // Availabe REPL commands, Populated via AddCmd(). Format is { CommandString: Function }
         private Dictionary<String, Func<string, Task>> _cmdList;
+
+        // Previous commands sent through DoCmd()
+        private List<string> _cmdHistory = new List<string>();
+
+        // Output text block and its dispatcher
         private CoreDispatcher _dispatcher;
         private TextBlock _textBlock;
+
+        // Misc
         private string _messageText = string.Empty;
         private readonly object _messageLock = new object();
         private int _messageCount;
-
-        private List<string> _cmdHistory = new List<string>();
-
 
         // Constructor - Creates an empty _cmdlist
         //  outputlist = the output "window", used to communicate with user
@@ -39,7 +42,6 @@ namespace FLogger
                 _dispatcher = _textBlock.Dispatcher;
         }
 
-
         // Adds a cmd to _cmdList
         //  cmd   = the command string. Ex: 'run build 2'
         //  func  = the function to call on receiving cmd - must accept one
@@ -49,13 +51,11 @@ namespace FLogger
             _cmdList.Add(cmd, func);
         }
 
-
         // Adds an attempted command to _cmdHistory, so it can be accessed with up/down arrows.
         public void AddCmdHistory(String cmd)
         {
             _cmdHistory.Add(cmd);
         }
-
 
         // Attempts to evaluate the given input string as a command and calls the
         // corresponding function(args). Also adds the string to _cmdHistory
@@ -95,7 +95,6 @@ namespace FLogger
             return cmdOK;
         }
 
-
         // Does output to _textBlock
         internal async void Log(string message)
         {
@@ -114,5 +113,6 @@ namespace FLogger
                 }
             });
         }
+
     }
 }
