@@ -1,4 +1,10 @@
-﻿using System;
+﻿/// MainPage.xaml.cs
+//  The main module for FLogger. Handles REPL and preview output.
+//
+//
+// Author: Dustin Fast, 2018
+
+using System;
 using System.Linq;
 using Windows.System;
 using Windows.Foundation;
@@ -6,12 +12,10 @@ using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
-
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Windows.ApplicationModel;
-using Windows.Devices.Enumeration;
 using Windows.Devices.Sensors;
 using Windows.Graphics.Imaging;
 using Windows.Media.Core;
@@ -33,8 +37,7 @@ namespace FLogger
     {
         // Sensors
         private readonly Inclinometer _inclineSensor = Inclinometer.GetDefault();
-        // TODO: private readonly LightSensor _lightSensor = LightSensor.GetDefault();
-        // TODO" private raeadonly ProximitySensor _prixSensor = ProximitySensor.GetDefault();
+        // TODO: private raeadonly ProximitySensor _prixSensor = ProximitySensor.GetDefault();
 
         // State Flags
         private bool _videoStreamOn = false;
@@ -46,7 +49,7 @@ namespace FLogger
         private List<object> _data = new List<object>();
 
         // Misc
-        private MediaFrameSourceKind _camMode = MediaFrameSourceKind.Infrared;  // Preferred camera mode
+        private MediaFrameSourceKind _camMode = MediaFrameSourceKind.Infrared;  // starting cam mode
         private MediaCapture _mediaCapture;
         private IMediaEncodingProperties _previewProperties;
         private FaceDetectionEffect _faceDetectionEffect;
@@ -66,7 +69,7 @@ namespace FLogger
             // Init REPL
             _repl = new ReadEvalPrintLoop(OutputList);
             _repl.AddCmd("stream", StreamMode);
-            _repl.AddCmd("nostream", StreamMode);
+            _repl.AddCmd("nostream", NoStreamMode);
             _repl.AddCmd("ir", CamMode); 
             _repl.AddCmd("exit", Exit);
 
@@ -86,25 +89,24 @@ namespace FLogger
         {
             if (args == "on")
             {
-                if (_videoStreamOn)
-                    OutputList.Items.Add("Already streaming... Chill.");
-                else if (_videoNoStreamOn)
+                if (_videoNoStreamOn)
                     OutputList.Items.Add("ERROR: Cannot start streaming while nostream is active.");
+                else if (_videoStreamOn)
+                    OutputList.Items.Add("Already streaming... Chill.");
                 else
                 {
                     await InitCamAsync();
                     await FaceDetectOnAsync();
                     await StartPreviewAsync();
                     _videoStreamOn = true;
-
                 }
             }
             else if (args == "off")
             {
-                if (!_videoStreamOn)
+                if (_videoNoStreamOn)
+                    OutputList.Items.Add("ERROR: Nostream mode is currently active.");
+                else if (!_videoStreamOn)
                     OutputList.Items.Add("Wasn't streaming... Chill.");
-                else if (_videoNoStreamOn)
-                    OutputList.Items.Add("ERROR: nostream is currently active.");
                 else
                 {
                     await StopPreviewAsync();
@@ -115,20 +117,48 @@ namespace FLogger
             }
             else
                 throw new System.InvalidOperationException("ERROR - Invalid argument: " + args);
-
         }
 
         // The 'nostream' command. Args = ( 'start' | 'stop')
         // Starts/Stops sensors in nostream mode, for on-demand data with no preview
         // _videoNoStreamOn is set here
-        private Task NoStreamMode(String args)
+        private async Task NoStreamMode(String args)
         {
-            return null;
+            if (args == "on")
+            {
+                if (_videoStreamOn)
+                    OutputList.Items.Add("ERROR: Cannot start nostream while streaming is active.");
+                else if (_videoNoStreamOn)
+                    OutputList.Items.Add("Already in nostream mode... Chill.");
+                else
+                {
+                    await InitCamAsync();
+                    await FaceDetectOnAsync();
+                    await StartPreviewAsync();
+                    _videoNoStreamOn = true;
+                }
+            }
+            else if (args == "off")
+            {
+                if (_videoStreamOn)
+                    OutputList.Items.Add("ERROR: Streaming mode is currently active.");
+                else if (!_videoNoStreamOn)
+                    OutputList.Items.Add("Wasn't in nostream mode... Chill.");
+                else
+                {
+                    await StopPreviewAsync();
+                    await FaceDetectOffAsync();
+                    await ReleaseCamAsync();
+                    _videoStreamOn = false;
+                }
+            }
+            else
+                throw new System.InvalidOperationException("ERROR - Invalid argument: " + args);
         }
 
-        // The 'ir' command. Args = null
+        // The 'ir' command.
         // Toggles the camera mode between color and IR mode.
-        private async Task CamMode(string args)
+        private async Task CamMode(string args=null)
         {
             // Toggle mode
             if (_camMode != MediaFrameSourceKind.Infrared)
@@ -149,6 +179,11 @@ namespace FLogger
             }
         }
 
+        private void ShowStatus()
+        {
+            //TODO: Outputs status to console
+        }
+
         // The 'exit' command. Args = null
         // Does cleanp and exits the application.
         private async Task Exit(String args)
@@ -162,7 +197,8 @@ namespace FLogger
             CoreApplication.Exit();
         }
 
-        // REPL command input textbox. Sends cmd for processing on Enter clicked.
+        // REPL command input textbox. On Enter clicked, moves cmd from the
+        // input box to the output/history box and sends it for processing.
         private void CmdInputTxt_KeyUp(object sender, Windows.UI.Xaml.Input.KeyRoutedEventArgs e)
         {
             if (e.Key == VirtualKey.Enter)
@@ -193,6 +229,7 @@ namespace FLogger
             var frameGroups = await MediaFrameSourceGroup.FindAllAsync();
 
             // For each source kind, find all sources of the kind we're interested in
+            // TODO: Move this out and do it only once.
             var eligibleGroups = frameGroups.Select(g => new
             {
                 Group = g,
@@ -215,6 +252,7 @@ namespace FLogger
                 MemoryPreference = MediaCaptureMemoryPreference.Cpu,
                 StreamingCaptureMode = StreamingCaptureMode.Video
             };
+
             try
             {
                 _mediaCapture = new MediaCapture();
@@ -345,10 +383,62 @@ namespace FLogger
             _faceDetectionEffect = null;
         }
 
-        /// Takes face information defined in preview coordinates and returns one in UI coordinates, taking
-        /// into account the position and size of the preview control.
-        /// faceBoxInPreviewCoordinates = Face coordinates as retried from the FaceBox property of a DetectedFace, in preview coordinates.
-        /// Rectangle in UI (CaptureElement) coordinates, to be used in a Canvas control.
+        //// Takes a media frame as a bitmp and the face rect as BitmapBounds and Returns
+        //// a rectangle. If both pupils found, rectangle is pupil x, y, h. Else, rect is 0x0x0
+        //private void getPupilCoords(Bitmap bmp, BitmapBounds faceBox)
+        //{
+        //    System.Drawing.Bitmap aq = (Bitmap)pictureBox1.Image; //take the image
+
+        //    // Invert the image, if color?
+        //    Invert a = new Invert();
+        //    aq = a.Apply(aq);
+        //    AForge.Imaging.Image.FormatImage(ref aq);
+
+        //    // apply grayscale, if color?
+        //    IFilter filter = Grayscale.CommonAlgorithms.BT709;
+        //    aq = filter.Apply(aq);
+
+        //    // Change to binary
+        //    Threshold th = new Threshold(220);
+        //    aq = th.Apply(aq);
+
+        //    // Divide the facebox into four quadrants:
+        //    // -----------
+        //    // | q1 | q2 |       
+        //    // -----------
+        //    // | q3 | q4 |       
+        //    // -----------
+
+
+        //    // For q1 and q2, because that's where the eyes are located:
+
+        //    // find the biggest object using BlobCounter
+        //    BlobCounter bl = new BlobCounter(aq);
+
+        //    /// If at least one blob, find the pupil start position and height
+        //    int x, y, h = 0;
+        //    if (bl.ObjectsCount > 0)
+        //    {
+        //        ExtractBiggestBlob fil2 = new ExtractBiggestBlob();
+        //        fil2.Apply(aq);
+        //        x = fil2.BlobPosition.X;
+        //        y = fil2.BlobPosition.Y;
+        //        h = fil2.Apply(aq).Height;
+        //    }
+            
+        //    return new Rectangle(new Point(x - h, y - h), new Size(3 * h, 3 * h));
+        //}
+
+        //public Bitmap CropImage(Bitmap source, Rectangle section)
+        //{
+        //    Bitmap bmp = new Bitmap(section.Width, section.Height);
+        //    Graphics g = Graphics.FromImage(bmp);
+        //    g.DrawImage(source, 0, 0, section, GraphicsUnit.Pixel);
+        //    return bmp;
+        //}
+
+        /// Takes face rectangle in preview coords and returns one in UI coords.
+        /// faceBoxInPreviewCoordinates = FaceBox.DetectedFace, in preview coordinates.
         private Rectangle ConvertPreviewToUiRectangle(BitmapBounds faceBoxInPreviewCoordinates)
         {
             var result = new Rectangle();
@@ -376,42 +466,41 @@ namespace FLogger
             return result;
         }
 
-        /// Calculates the size and location of the rectangle that contains the preview stream within the preview control, when the scaling mode is Uniform
-        /// previewResolution = The resolution at which the preview is running
-        /// previewControl = The control that is displaying the preview using Uniform as the scaling mode
-        public Rect GetPreviewStreamRectInControl(VideoEncodingProperties previewResolution, CaptureElement previewControl)
+        /// Calculates size/coords of preview stream rect within the preview control. 
+        /// When scaling mode is Uniform:
+        ///      prevRes = Resolution at which the preview is running
+        ///      prevCtrl = Control displaying the preview(has Uniform as the scaling mode)
+        /// # TODO: Adapted from: MS Article
+        public Rect GetPreviewStreamRectInControl(VideoEncodingProperties prevRes, CaptureElement prevCtrl)
         {
             var result = new Rect();
 
-            // In case this function is called before everything is initialized correctly, return an empty result
-            if (previewControl == null || previewControl.ActualHeight < 1 || previewControl.ActualWidth < 1 ||
-                previewResolution == null || previewResolution.Height == 0 || previewResolution.Width == 0)
-            {
+            // If not initizalied, return empty result
+            if (prevCtrl == null || prevCtrl.ActualHeight < 1 || prevCtrl.ActualWidth < 1 ||
+                prevRes == null || prevRes.Height == 0 || prevRes.Width == 0)
                 return result;
-            }
 
-            var streamWidth = previewResolution.Width;
-            var streamHeight = previewResolution.Height;
+            // Set result to actual h/w of preview control
+            result.Width = prevCtrl.ActualWidth;
+            result.Height = prevCtrl.ActualHeight;
 
-            // Start by assuming the preview display spans the entire width and height 
-            result.Width = previewControl.ActualWidth;
-            result.Height = previewControl.ActualHeight;
-
-            // If UI is "wider" than preview, letterboxing will be on the sides
-            if ((previewControl.ActualWidth / previewControl.ActualHeight > streamWidth / (double)streamHeight))
+            // Adjust result if UI is wider or taller than preview stream
+            var streamWidth = prevRes.Width;
+            var streamHeight = prevRes.Height;
+            if ((prevCtrl.ActualWidth / prevCtrl.ActualHeight > streamWidth / (double)streamHeight))
             {
-                var scale = previewControl.ActualHeight / streamHeight;
+                // Taller. Letterboxing will be on sides.
+                var scale = prevCtrl.ActualHeight / streamHeight;
                 var scaledWidth = streamWidth * scale;
-
-                result.X = (previewControl.ActualWidth - scaledWidth) / 2.0;
+                result.X = (prevCtrl.ActualWidth - scaledWidth) / 2.0;
                 result.Width = scaledWidth;
             }
-            else // Preview stream is "wider" than UI, so letterboxing will be on the top+bottom
+            else 
             {
-                var scale = previewControl.ActualWidth / streamWidth;
+                // Wider. Letterboxing will be on top+bottom
+                var scale = prevCtrl.ActualWidth / streamWidth;
                 var scaledHeight = streamHeight * scale;
-
-                result.Y = (previewControl.ActualHeight - scaledHeight) / 2.0;
+                result.Y = (prevCtrl.ActualHeight - scaledHeight) / 2.0;
                 result.Height = scaledHeight;
             }
 
@@ -496,7 +585,7 @@ namespace FLogger
             else if (_videoNoStreamOn)
                 await NoStreamMode("on");
         }
-        protected override async void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             Debug.WriteLine("Navigated To");
             //if (_videoStreamOn)
@@ -504,7 +593,7 @@ namespace FLogger
             //else if (_videoNoStreamOn)
             //    await NoStreamMode("on");
         }
-        protected override async void OnNavigatingFrom(NavigatingCancelEventArgs e)
+        protected override void OnNavigatingFrom(NavigatingCancelEventArgs e)
         {
             Debug.WriteLine("Navigated From");
             //if (_videoStreamOn)

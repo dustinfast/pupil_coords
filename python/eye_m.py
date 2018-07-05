@@ -4,11 +4,9 @@
 __author__ = "Dustin Fast (dustin.fast@outlook.com)"
 
 
-# from datetime import datetime
 from eye_m_learn import Learner
 from eye_m_finder import Finder
 from eye_m_classlib import Mouse
-
 
 finder = Finder()
 learner = Learner()
@@ -18,6 +16,7 @@ def onclick(event):
     print(event.Position)
     print(face)
 
+    # If a face was detected, send it to be learned from
     if face:
         learner.give_data(face.as_dict)
     return True
@@ -26,7 +25,7 @@ def start():
     mouse = Mouse(onclick=onclick)
     mouse.click_watch.start()
 
-    # Start mousing after sufficient learning
+    # TODO: Start mousing after sufficient learning
 
     # Wait for quit and do cleanup
     raw_input("Running... Press Enter to quit.\n")
