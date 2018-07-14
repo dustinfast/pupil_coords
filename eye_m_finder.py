@@ -1,4 +1,4 @@
-""" eye_findeyes.py. The eye/pupil detection class - Uses OpenCV to find users 
+""" pupils.py Uses OpenCV to find users 
     face via the webcam and note coordinates of pupils and nose.
     A live mode, Eyes.run() displays these coords overlaid on live output.
     An on-demand mode processes frames as requested and returns the coords.
@@ -8,7 +8,6 @@ __author__ = "Dustin Fast (dustin.fast@outlook.com)"
 
 import cv2
 from time import sleep
-from eye_m_classlib import Face
 from eye_m_classlib import Queue
 
 # Cascade models for cv2 classifiers
@@ -22,6 +21,55 @@ NOSE_HAAR = 'models/haarcascade_nose.xml'
 # MISC
 ACCURACY_DENOM = 100
 CAMERA_ID = 0
+
+
+class Face(object):
+    """ The user's pupil and nose coordinates and other related information.
+    """
+
+    def __init__(self):
+        self.nose_x = -1
+        self.nose_y = -1
+        self.l_eye_x = -1
+        self.l_eye_y = -1
+        self.r_eye_x = -1
+        self.r_eye_y = -1
+        self.depth = -1  # TODO
+        self.blink = -1  # TODO
+
+    def __str__(self):
+        """ Returns a string representation of the facial coords.
+        """
+        ret_str = 'l_eye: ('
+        ret_str += str(self.l_eye_x) + ', '
+        ret_str += str(self.l_eye_y) + ')\n'
+        ret_str += 'r_eye: ('
+        ret_str += str(self.r_eye_x) + ', '
+        ret_str += str(self.r_eye_y) + ')\n'
+        ret_str += 'nose: ('
+        ret_str += str(self.nose_y) + ', '
+        ret_str += str(self.nose_y) + ')'
+        return ret_str
+
+    def as_points(self):
+        """ Returns a list of two-tuples containing the facial feature coords:
+            [ (l_eye), (r_eye), (nose) ]
+        """
+        pts = []
+        pts.append((self.l_eye_x, self.l_eye_y))
+        pts.append((self.r_eye_x, self.r_eye_y))
+        pts.append((self.nose_x, self.nose_y))
+        return pts
+
+    def as_dict(self):
+        """ Returns a dict of the facial feature coords.
+        """
+        dic = {}
+        dic['l_eye_x'] = self.l_eye_x
+        dic['l_eye_y'] = self.l_eye_y
+        dic['nose_x'] = self.nose_x
+        dic['nosey'] = self.nosy_y
+        return dic
 
 
 class Finder(object):

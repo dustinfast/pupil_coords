@@ -2,120 +2,12 @@
 
 __author__ = "Dustin Fast (dustin.fast@outlook.com)"
 
-import pyHook as pyHook
-import win32api as api
-import pythoncom as pythoncom
 import multiprocessing as mp
-
-
-class Mouse(object):
-    """ Mouse monitoring and control functions.
-        cmd_signal: a callback or a keystroke.
-        onlick/onmove: a function or string for eval().
-        TODO: Currently works for windows mouse only
-    """
-
-    def __init__(self, onclick=None, onmove=None, oncmd=None):
-        self.cmd_watch = mp.Process(target=self._cmd_watch, args=(oncmd,))
-        self.click_watch = mp.Process(target=self._click_watch, args=(onclick,))
-        self.move_watch = mp.Process(target=self._move_watch, args=(onmove,))
-        self.eye_tracker = mp.Process(target=self._eye_tracker)
-
-    def _detected(self, action):
-        if type(action) is string:
-            eval(action)
-        else:
-            action()
-
-    def _click_watch(self, onclick):
-        """ Watches for clicks and executes given function on detect.
-            Use with click_watcher.start() only.
-        """
-        assert(onclick)
-        print('Watching for clicks...')
-
-        mhook = pyHook.HookManager()
-        mhook.SubscribeMouseAllButtonsDown(onclick)
-        mhook.HookMouse()
-        pythoncom.PumpMessages()
-        self._detected(onclick)  # on click detected # TODO: Stops on lose focus
-        mhook.UnhookMouse()
-
-        print('unhooked')   # TODO: Never unhooks - Test safety 
-
-    def _move_watch(self, onmove):
-        """ Watches for mouse movement and executes given function on detect.
-            Use with move_watcher.start() only.
-        """
-        # assert(onmove)
-        # print('Watching for mouse movement...')
-
-        # def on_event(event):
-        #     # if event.Message == 'mouse move':
-        #     self._detected(onmove))
-        #     return True
-
-        # hmouse = pyHook.HookManager()
-        # hmouse.MouseAll = on_event
-        # hmouse.HookMouse()
-        # pythoncom.PumpMessages()
-        pass
-
-    def _cmd_watch(self, oncmd):
-        """ Watches for given cmd_signal and executes given function on detect.
-            Use with cmd_watcher.start() only.
-        """
-        pass
-
-    def _eye_tracker(self):
-        """ Tracks user's gaze and moves (or returns?) the mouse accordingly.
-            Use with eye_tracker.start() only.
-        """
-        pass
-
-    def click(self, x, y):
-        """ Clicks the mouse at the given screen coords.
-        """
-        assert(type(x) is int and type(y) is int)
-        put_currsor_at(x, y)
-        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, x, y, 0, 0)
-        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, x, y, 0, 0)
-
-    def get_coords(self):
-        """ Returns current mouse coords as two integers.
-        """
-        return win32api.GetCursorPos()
-
-    def set_coords(self, x, y):
-        """ Sets the mouse cursor position to the given coordinates.
-        """
-        assert(type(x) is int and type(y) is int)
-        win32api.SetCursorPos((x, y))
-
-
-# TODO: Move these to dfstruct
-class Stack:
-    """ A stack data structure.
-        Exposes push, pop, and is_empty.
-    """
-    def __init__(self):
-        self.data = []
-
-    def push(self, p):
-        self.data.append(p)
-
-    def pop(self):
-        return self.data.pop()
-
-    def is_empty(self):
-        return len(self.data) == 0
-
 
 class Queue:
     """ A Queue data structure.
         Exposes reset, push, pop, shove, cut, peek, top, is_empty, item_count, 
         and get_items.
-        TODO: contains. use list.pop()
     """
     def __init__(self, maxsize=None):
         self.items = []             # Container
@@ -198,6 +90,7 @@ class Queue:
 class Face(object):
     """ The user's pupil and nose coordinates and other related information.
     """
+
     def __init__(self):
         self.nose_x = -1
         self.nose_y = -1
@@ -205,8 +98,6 @@ class Face(object):
         self.l_eye_y = -1
         self.r_eye_x = -1
         self.r_eye_y = -1
-        self.depth = -1  # TODO
-        self.blink = -1  # TODO
 
     def __str__(self):
         """ Returns a string representation of the facial coords.
@@ -231,7 +122,7 @@ class Face(object):
         pts.append((self.r_eye_x, self.r_eye_y))
         pts.append((self.nose_x, self.nose_y))
         return pts
-    
+
     def as_dict(self):
         """ Returns a dict of the facial feature coords.
         """
