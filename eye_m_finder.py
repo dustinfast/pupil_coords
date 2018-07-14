@@ -8,7 +8,6 @@ __author__ = "Dustin Fast (dustin.fast@outlook.com)"
 
 import cv2
 from time import sleep
-from eye_m_classlib import Queue
 
 # Cascade models for cv2 classifiers
 EYE_HAAR = 'models/haarcascade_eye.xml'
@@ -23,8 +22,58 @@ ACCURACY_DENOM = 100
 CAMERA_ID = 0
 
 
+class ShoveQueue:
+    """ A Queue data structure with pop and shove operations.
+        Exposes reset, push, pop, shove, cut, peek, top, is_empty, item_count, 
+        and get_items.
+    """
+
+    def __init__(self, maxsize=None):
+        self.items = []             # Container
+        self.maxsize = maxsize      # Max size of self.items
+
+        # Validate maxsize and populate with defaultdata
+        if maxsize and maxsize < 0:
+                raise Exception('Invalid maxsize parameter.')
+
+    def shove(self, item):
+        """ Adds an item to the back of queue. If queue already full, makes
+            room for it by removing the item at front. If an item is removed
+            in this way, it is returned.
+        """
+        removed = None
+        if self.is_full():
+            removed = self.pop()
+        self.items.append(item)
+        return removed
+
+    def pop(self):
+        """ Removes front item from queue and returns it.
+        """
+        if self.is_empty():
+            raise Exception('Attempted to pop from an empty queue.')
+        d = self.items[0]
+        self.items = self.items[1:]
+        return d
+
+    def is_empty(self):
+        """ Returns true iff queue empty.
+        """
+        return self.item_count() == 0
+
+    def is_full(self):
+        """ Returns true iff queue at max capacity.
+        """
+        return self.maxsize and self.item_count() >= self.maxsize
+
+    def item_count(self):
+        """ Returns the count (an int) of the number of items in the queue.
+        """
+        return len(self.items)
+
+
 class Face(object):
-    """ The user's pupil and nose coordinates and other related information.
+    """ Representation of a face as defined by its pupil and nose coordinates.
     """
 
     def __init__(self):
@@ -51,7 +100,7 @@ class Face(object):
         ret_str += str(self.nose_y) + ')'
         return ret_str
 
-    def as_points(self):
+    def get_points(self):
         """ Returns a list of two-tuples containing the facial feature coords:
             [ (l_eye), (r_eye), (nose) ]
         """
@@ -60,16 +109,6 @@ class Face(object):
         pts.append((self.r_eye_x, self.r_eye_y))
         pts.append((self.nose_x, self.nose_y))
         return pts
-
-    def as_dict(self):
-        """ Returns a dict of the facial feature coords.
-        """
-        dic = {}
-        dic['l_eye_x'] = self.l_eye_x
-        dic['l_eye_y'] = self.l_eye_y
-        dic['nose_x'] = self.nose_x
-        dic['nosey'] = self.nosy_y
-        return dic
 
 
 class Finder(object):
@@ -87,7 +126,7 @@ class Finder(object):
         self.frame = None        # Curr camera frame
 
         # Last 50 results (as bools), for accuracy calculation
-        self.results = Queue(maxsize=ACCURACY_DENOM)
+        self.results = ShoveQueue(maxsize=ACCURACY_DENOM)
 
         # Optimized frame
         self.frame_opt = None   # Optimized version of self.frame
@@ -130,8 +169,10 @@ class Finder(object):
         if not (len(eyes) == 2 and len(nose) == 1):  
             return
 
-        # Extract eye coords
+        # "eyes" is a box around each eye. Approximate pupil coords by taking
+        # the intersection of the triangles formed by each.
         for i, (x, y, w, z) in enumerate(eyes):
+            # Pupil coord is 
             eye_x = x + w / 2
             eye_y = y + z / 2
             if i % 2 == 1:
@@ -141,12 +182,8 @@ class Finder(object):
                 eye_2_x = eye_x
                 eye_2_y = eye_y
 
-        # Fail if eyes unreasonably close together # TODO: Needed?
-        # if ((eye_2_x - eye_1_x) < 20) or ((eye_1_x - eye_2_x) < 20):
-        #     _fail()  
-        #     return 
-
-        # Assign coords to correct eyes
+        # Determine which set of coords is for which eye and update self.face
+        # accordingly.
         if eye_1_x < eye_2_x:  
             self.face.l_eye_x = eye_1_x
             self.face.l_eye_y = eye_1_y
@@ -172,7 +209,7 @@ class Finder(object):
         # cv2.putText(self.frame, txt, (10, 20), FONT, 0.4, (0, 0, 255), 1, LINE)
 
         # Add each face point to frame
-        for p in self.face.as_points():
+        for p in self.face.get_points():
             cv2.circle(self.frame, (p[0], p[1]), 1, (0, 255, 0), 1)
 
     def _reset_coords(self):
@@ -198,22 +235,7 @@ class Finder(object):
             finds += 1
         return finds / denom * 100
 
-    def run_single(self, showframe=False):
-        """ Gets and processes a single frame, then returns a Face object.
-            Optionally displays frames (handy for debugging).
-        """
-        self._do_extras = showframe
-        self._camera = cv2.VideoCapture(CAMERA_ID)  # TODO: Perf?
-        self._update()
-        self._camera.release()
-
-        if self.success:
-            if showframe:
-                cv2.imshow('frame', self.frame)
-                cv2.imshow('optimized frame', self.frame_opt)
-            return self.face
-
-    def run_live(self, fps=0.015):  # fps=.03 -> 30fps, fps=.015 -> 60fps
+    def run_live(self, fps=0.015):  # fps=.03 -> 30fps, fps=.015 -> ~60fps
             """ Runs the data capture continuously. Displays frame and frame_opt
                 in a window. Spacebar quits.
             """
@@ -225,7 +247,7 @@ class Finder(object):
                 cv2.imshow('optimzed frame', self.frame_opt)
                 if cv2.waitKey(1) == 32:
                     break  # spacebar to quit
-                sleep(fps)  # ~ 60 FPS
+                sleep(fps)
             cv2.destroyAllWindows()
             self._do_extras = False
             self._camera.release()
