@@ -1,23 +1,4 @@
-
-[Dd]ebug/
-[Dd]ebugPublic/
-[Rr]elease/
-[Rr]eleases/
-[Xx]64/
-[Xx]86/
-[Bb]uild/
-bld/
-[Oo]bj/
-bin/
-.vs/
 .vscode/
 *.py[cod]*.com
-*.class
-*.dll
-*.exe
-*.pdb
-*.dll.config
-*.cache
-*.suo
 *.pfx
 
