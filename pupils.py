@@ -171,5 +171,8 @@ class Finder(object):
 
 
 if __name__ == '__main__':
+    # Init finder object
     finder = Finder()
+
+    # Run and display output
     finder.run()
