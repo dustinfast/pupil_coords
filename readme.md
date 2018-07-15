@@ -1,6 +1,6 @@
 # pupilpy
 
-Demonstrates using OpenCV's webcam and facial feature classification functionality can be used to easily approximate the users eye/nose coordinates in real time.  
+Demonstrates using OpenCV's webcam and facial feature classification functionality to easily approximate the users eye/nose coordinates in real time.  
   
 Results are displayed as webcam output:
   
